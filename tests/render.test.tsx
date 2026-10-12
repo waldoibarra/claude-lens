@@ -110,12 +110,44 @@ describe('lens rendering', () => {
       )
       await runOne.press({ key: 'toggle' })
       expect((await runOne.find({ key: 'toggle' }))?.text).toBe('▾ 2 steps')
-      expect((await runOne.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
-        '✓ Read a.ts',
-        '✓ Read b.ts',
-        expect.stringMatching(/^Claude · /),
-      ])
+      expect((await runOne.find({ key: `step-${steps[0]!}` }))?.text).toBe('▸ ✓ Read a.ts')
+      const runOneSecond = await mount(steps[1]!, 'Read')
+      expect((await runOneSecond.find({ key: `step-${steps[1]!}` }))?.text).toBe('▸ ✓ Read b.ts')
+      expect((await runOneSecond.find({ key: 'label' }))?.text).toMatch(/^Claude · /)
+      await runOneSecond.press({ key: `step-${steps[1]!}` })
+      const openCleanResult = await $.ui.mount({
+        plugin: 'lens',
+        surface,
+        component: 'ToolResult',
+        requestId: steps[1]!,
+        props: {
+          tool_use_id: steps[1]!,
+          tool: 'Read',
+          output: { type: 'text', file: { numLines: 12 } },
+          isErrored: false,
+        },
+      })
+      expect(await openCleanResult.find({ text: 'ENGINE' })).toBeDefined()
+      await openCleanResult.unmount()
       await runOne.press({ key: 'toggle' })
+      const closedCleanResult = await $.ui.mount({
+        plugin: 'lens',
+        surface,
+        component: 'ToolResult',
+        requestId: steps[1]!,
+        props: {
+          tool_use_id: steps[1]!,
+          tool: 'Read',
+          output: { type: 'text', file: { numLines: 12 } },
+          isErrored: false,
+        },
+      })
+      expect(await closedCleanResult.find({ key: 'folded' })).toBeDefined()
+      await closedCleanResult.unmount()
+      await runOne.press({ key: 'toggle' })
+      await runOneSecond.press({ key: `step-${steps[1]!}` })
+      await runOne.press({ key: 'toggle' })
+      await runOneSecond.unmount()
 
       // Run 2: the failing command and the edit; one plain error line.
       const runTwo = await mount(steps[2]!, 'Bash')
@@ -158,12 +190,19 @@ describe('lens rendering', () => {
     })
     expect((await runOne.find({ key: 'line' }))?.text).toBe('• Read 2 files')
     expect(await runOne.find({ key: 'toggle' })).toBeUndefined()
-    expect((await runOne.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
-      '• Read 2 files',
-      '✓ Read a.ts · 12 lines',
-      '✓ Read b.ts · 12 lines',
-      expect.stringMatching(/^Claude · /),
-    ])
+    expect((await runOne.findAll({ type: 'Text' })).map(t => t.text)).toEqual(['• Read 2 files'])
+    expect((await runOne.find({ key: `step-${steps[0]!}` }))?.text).toBe('▸ ✓ Read a.ts · 12 lines')
+    const runOneSecond = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: steps[1]!,
+      props: toolRow(steps[1]!, 'Read', {}),
+    })
+    expect((await runOneSecond.find({ key: `step-${steps[1]!}` }))?.text).toBe(
+      '▸ ✓ Read b.ts · 12 lines',
+    )
+    expect((await runOneSecond.find({ key: 'label' }))?.text).toMatch(/^Claude · /)
     const runTwo = await $.ui.mount({
       plugin: 'lens',
       surface: 'terminal',
@@ -178,13 +217,21 @@ describe('lens rendering', () => {
       '• Changed 1 file, ran 1 command (1 failed)',
       '  The command failed (exit 1). Press Ctrl+O to see its output.',
       '  npm ERR! Missing script: "tset"',
-      expect.stringMatching(/^Opus 5\.5 · \d\d:\d\d$/),
     ])
-    // The failed command and the edit open their output and diff on click.
-    expect((await runTwo.find({ key: `step-${steps[2]!}` }))?.text).toBe('✗ Run the tests · exit 1')
-    expect((await runTwo.find({ key: `step-${steps[3]!}` }))?.text).toBe(
-      '✓ Edited a.ts · +1 −1 lines',
+    expect((await runTwo.find({ key: `step-${steps[2]!}` }))?.text).toBe(
+      '▸ ✗ Run the tests · exit 1',
     )
+    const editRow = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: steps[3]!,
+      props: toolRow(steps[3]!, 'Edit', {}),
+    })
+    expect((await editRow.find({ key: `step-${steps[3]!}` }))?.text).toBe(
+      '▸ ✓ Edited a.ts · +1 −1 lines',
+    )
+    expect((await editRow.find({ key: 'label' }))?.text).toMatch(/^Opus 5\.5 · \d\d:\d\d$/)
   })
 
   test('both views show the model a sub-agent ran', async ($, on) => {
@@ -199,8 +246,8 @@ describe('lens rendering', () => {
       requestId: bottom.ids[0]!,
       props: toolRow(bottom.ids[0]!, 'Agent', {}),
     })
-    expect((await ui.findAll({ type: 'Text' }))[1]?.text).toBe(
-      '✓ Delegated: Count lines · Haiku 5.5 · 6s',
+    expect((await ui.find({ key: `step-${bottom.ids[0]!}` }))?.text).toBe(
+      '▸ ✓ Delegated: Count lines · Haiku 5.5 · 6s',
     )
     await ui.unmount()
 
@@ -214,8 +261,8 @@ describe('lens rendering', () => {
       props: toolRow(bottom.ids[0]!, 'Agent', {}),
     })
     await lean.press({ key: 'toggle' })
-    expect((await lean.findAll({ type: 'Text' }))[0]?.text).toBe(
-      '✓ Delegated: Count lines · Haiku 5.5',
+    expect((await lean.find({ key: `step-${bottom.ids[0]!}` }))?.text).toBe(
+      '▸ ✓ Delegated: Count lines · Haiku 5.5',
     )
 
     // Its "finished" row carries the model and finish time, gray.
@@ -238,33 +285,34 @@ describe('lens rendering', () => {
     })
   })
 
-  test('clicking a step shows its diff or output in place', async ($, on) => {
+  test('clicking a step delegates detail to its native row', async ($, on) => {
     const steps = await playTurn($, engineBottom(on))
     await $.command.run({ command: 'lens', args: 'normal' } as never)
-    const ui = await $.ui.mount({
+    const edit = `step-${steps[3]!}`
+    const editRow = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: steps[3]!,
+      props: toolRow(steps[3]!, 'Edit', {}),
+    })
+    expect((await editRow.find({ key: edit }))?.text).toBe('▸ ✓ Edited a.ts · +1 −1 lines')
+    await editRow.press({ key: edit })
+    expect((await editRow.find({ key: edit }))?.text).toBe('▾ ✓ Edited a.ts · +1 −1 lines')
+    expect(await editRow.find({ text: 'ENGINE' })).toBeDefined()
+
+    const commandRow = await $.ui.mount({
       plugin: 'lens',
       surface: 'terminal',
       component: 'ToolUse',
       requestId: steps[2]!,
       props: toolRow(steps[2]!, 'Bash', {}),
     })
-    const edit = `step-${steps[3]!}`
-    expect((await ui.find({ key: edit }))?.text).toBe('✓ Edited a.ts · +1 −1 lines')
-    expect(await ui.find({ type: 'Code' })).toBeUndefined()
-    await ui.press({ key: edit })
-    const code = await ui.find({ type: 'Code' })
-    expect(code?.props).toMatchObject({ format: 'diff', source: '@@ -1,1 +1,1 @@\n-x\n+y' })
-    await ui.press({ key: edit })
-    expect(await ui.find({ type: 'Code' })).toBeUndefined()
-    // A failed command opens its command, then its error output.
-    await ui.press({ key: `step-${steps[2]!}` })
-    expect((await ui.findAll({ type: 'Code' })).map(c => c.props)).toEqual([
-      { source: '$ npm run tset -- --fail', language: 'bash' },
-      { source: 'Exit code 1\nnpm ERR! Missing script: "tset"' },
-    ])
+    await commandRow.press({ key: `step-${steps[2]!}` })
+    expect(await commandRow.find({ text: 'ENGINE' })).toBeDefined()
   })
 
-  test('a command opens to show what ran and its full output', async ($, on) => {
+  test('a command opens its native detail row', async ($, on) => {
     const bottom = engineBottom(on)
     await $.turn.start({ text: 'run', turnId: 'turn-6' })
     await $.tool.call({ tool: 'Bash', command: 'echo hello', description: 'Say hello' })
@@ -279,24 +327,25 @@ describe('lens rendering', () => {
         props: toolRow(bottom.ids[0]!, 'Bash', {}),
       })
       if (view === 'clean') await ui.press({ key: 'toggle' })
-      // The command sits in its own bordered box, the full output under it.
       await ui.press({ key: `step-${bottom.ids[0]!}` })
-      expect(
-        (await ui.findAll({ type: 'Code' })).map(c => c.props),
-        view,
-      ).toEqual([{ source: '$ echo hello', language: 'bash' }, { source: 'hello' }])
-      const box = (await ui.findAll({ type: 'Box' })).find(b => b.props.borderStyle === 'round')
-      expect(box?.text, view).toBe('$ echo hello')
+      expect(await ui.find({ text: 'ENGINE' }), view).toBeDefined()
       await ui.press({ key: `step-${bottom.ids[0]!}` })
-      // A command that printed nothing still opens, to show what ran.
-      await ui.press({ key: `step-${bottom.ids[1]!}` })
-      expect(await ui.find({ type: 'Text', text: '(no output)' }), view).toBeDefined()
-      await ui.press({ key: `step-${bottom.ids[1]!}` })
+      const quiet = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolUse',
+        requestId: bottom.ids[1]!,
+        props: toolRow(bottom.ids[1]!, 'Bash', {}),
+      })
+      await quiet.press({ key: `step-${bottom.ids[1]!}` })
+      expect(await quiet.find({ text: 'ENGINE' }), view).toBeDefined()
+      await quiet.press({ key: `step-${bottom.ids[1]!}` })
+      await quiet.unmount()
       await ui.unmount()
     }
   })
 
-  test('normal caps a run at 5 steps until opened', async ($, on) => {
+  test('normal shows 5 run steps until opened', async ($, on) => {
     const bottom = engineBottom(on)
     await $.command.run({ command: 'lens', args: 'normal' } as never)
     await $.turn.start({ text: 'read a lot', turnId: 'turn-7' })
@@ -308,31 +357,190 @@ describe('lens rendering', () => {
       requestId: bottom.ids[0]!,
       props: toolRow(bottom.ids[0]!, 'Read', {}),
     })
-    const texts = async () => (await ui.findAll({ type: 'Text' })).map(t => t.text)
-    expect((await texts()).slice(0, -1)).toEqual(
-      [1, 2, 3, 4, 5].map(n => `✓ Read f${n}.ts · 12 lines`),
+    expect((await ui.find({ key: 'line' }))?.text).toBe('• Read 7 files')
+    expect((await ui.find({ key: `step-${bottom.ids[0]!}` }))?.text).toBe(
+      '▸ ✓ Read f1.ts · 12 lines',
+    )
+    const fifth = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[4]!,
+      props: toolRow(bottom.ids[4]!, 'Read', {}),
+    })
+    expect((await fifth.find({ key: `step-${bottom.ids[4]!}` }))?.text).toBe(
+      '▸ ✓ Read f5.ts · 12 lines',
     )
     // `+2 more` opens the run in place; `show fewer` closes it again.
-    expect((await ui.find({ key: 'more-toggle' }))?.text).toBe('+2 more')
-    await ui.press({ key: 'more-toggle' })
-    expect(await texts()).toHaveLength(8)
-    expect(await ui.find({ key: 'more-toggle' })).toBeUndefined()
-    await ui.press({ key: 'fewer-toggle' })
-    expect(await texts()).toHaveLength(6)
-    await ui.press({ key: 'toggle' })
-    expect(await texts()).toHaveLength(8)
+    // The normal total stays informational, even for a long or expanded run.
+    expect(await ui.find({ key: 'toggle' })).toBeUndefined()
+    expect((await fifth.find({ key: 'more-toggle' }))?.text).toBe('+2 more')
+    await fifth.press({ key: 'more-toggle' })
+    expect((await fifth.find({ key: 'fewer-toggle' }))?.text).toBe('show fewer')
+    const seventh = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[6]!,
+      props: toolRow(bottom.ids[6]!, 'Read', {}),
+    })
+    expect((await seventh.find({ key: `step-${bottom.ids[6]!}` }))?.text).toBe(
+      '▸ ✓ Read f7.ts · 12 lines',
+    )
+    expect(await ui.find({ key: 'toggle' })).toBeUndefined()
+    expect(await seventh.find({ key: 'more-toggle' })).toBeUndefined()
+    expect(await seventh.find({ key: 'fewer-toggle' })).toBeUndefined()
+    await seventh.press({ key: `step-${bottom.ids[6]!}` })
+    const seventhResult = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: bottom.ids[6]!,
+      props: {
+        tool_use_id: bottom.ids[6]!,
+        tool: 'Read',
+        output: { type: 'text', file: { numLines: 12 } },
+        isErrored: false,
+      },
+    })
+    expect(await seventhResult.find({ text: 'ENGINE' })).toBeDefined()
+    await fifth.press({ key: 'fewer-toggle' })
+    await seventhResult.unmount()
+    const hiddenResult = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: bottom.ids[6]!,
+      props: {
+        tool_use_id: bottom.ids[6]!,
+        tool: 'Read',
+        output: { type: 'text', file: { numLines: 12 } },
+        isErrored: false,
+      },
+    })
+    expect(await hiddenResult.find({ key: 'folded' })).toBeDefined()
+    await hiddenResult.unmount()
+    await seventh.unmount()
+    const hiddenAgain = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[6]!,
+      props: toolRow(bottom.ids[6]!, 'Read', {}),
+    })
+    expect(await hiddenAgain.find({ key: `step-${bottom.ids[6]!}` })).toBeUndefined()
+  })
+
+  test('normal keeps the toggle stationary and shows a hidden running step', async ($, on) => {
+    const bottom = engineBottom(on)
+    await $.command.run({ command: 'lens', args: 'normal' } as never)
+    await $.turn.start({ text: 'long run', turnId: 'turn-current-hidden' })
+    for (let n = 1; n <= 5; n += 1) await $.tool.call({ tool: 'Read', file_path: `/p/f${n}.ts` })
+
+    bottom.whileRunning = async () => {
+      const first = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolUse',
+        requestId: bottom.ids[0]!,
+        props: toolRow(bottom.ids[0]!, 'Read', {}),
+      })
+      expect((await first.find({ key: 'line' }))?.text).toBe('• Read 6 files · Current: Read f6.ts')
+      const fifth = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolUse',
+        requestId: bottom.ids[4]!,
+        props: toolRow(bottom.ids[4]!, 'Read', {}),
+      })
+      expect((await fifth.find({ key: 'more-toggle' }))?.text).toBe('+1 more')
+      const hidden = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolUse',
+        requestId: bottom.ids[5]!,
+        props: { ...toolRow(bottom.ids[5]!, 'Read', {}), isRunning: true, output: undefined },
+      })
+      const folded = await hidden.drawn()
+      expect(folded).toMatchObject({ type: 'Box', props: { key: 'folded', display: 'none' } })
+      await fifth.press({ key: 'more-toggle' })
+      expect((await fifth.find({ key: 'fewer-toggle' }))?.text).toBe('show fewer')
+      expect((await hidden.find({ key: `step-${bottom.ids[5]!}` }))?.text).toBe('▸ … Read f6.ts')
+      expect(await hidden.find({ key: 'fewer-toggle' })).toBeUndefined()
+      await fifth.press({ key: 'fewer-toggle' })
+      await hidden.unmount()
+      await fifth.unmount()
+      await first.unmount()
+      bottom.whileRunning = undefined
+    }
+    await $.tool.call({ tool: 'Read', file_path: '/p/f6.ts' })
+
+    const settled = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[0]!,
+      props: toolRow(bottom.ids[0]!, 'Read', {}),
+    })
+    expect((await settled.find({ key: 'line' }))?.text).toBe('• Read 6 files')
+    await settled.unmount()
+
+    await $.tool.call({ tool: 'Bash', command: 'fail', description: 'Run failing check' })
+    const failed = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[0]!,
+      props: toolRow(bottom.ids[0]!, 'Read', {}),
+    })
+    expect((await failed.find({ key: 'line' }))?.text).toBe(
+      '• Read 6 files, ran 1 command (1 failed)',
+    )
+    const failedFifth = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[4]!,
+      props: toolRow(bottom.ids[4]!, 'Read', {}),
+    })
+    expect((await failedFifth.find({ key: 'more-toggle' }))?.text).toBe('+2 more')
+    await failedFifth.unmount()
+    await failed.unmount()
+  })
+
+  test('normal omits the redundant total for one-step runs', async ($, on) => {
+    const bottom = engineBottom(on)
+    await $.command.run({ command: 'lens', args: 'normal' } as never)
+    await $.turn.start({ text: 'read one file', turnId: 'turn-single' })
+    await $.tool.call({ tool: 'Read', file_path: '/p/only.ts' })
+    const ui = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[0]!,
+      props: toolRow(bottom.ids[0]!, 'Read', {}),
+    })
+    expect(await ui.find({ key: 'line' })).toBeUndefined()
+    expect(await ui.find({ key: 'toggle' })).toBeUndefined()
+    expect((await ui.find({ key: `step-${bottom.ids[0]!}` }))?.text).toBe(
+      '▸ ✓ Read only.ts · 12 lines',
+    )
+    expect((await ui.find({ key: 'label' }))?.text).toMatch(/^Claude · /)
   })
 
   test('text blocks get a coloured label; runs a gray one under their steps', async ($, on) => {
     const seen: Array<{ text: string; isFirstOfReply: boolean }> = []
-    let group: { isExpanded: boolean } | undefined
+    let group: { isExpanded: boolean; ids: string[] } | undefined
     on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
       seen.push({ text: e.props.text, isFirstOfReply: e.props.isFirstOfReply })
       const { Text } = $.ui.resolve(e)
       return <Text>ENGINE</Text>
     })
     on('ui.render', { component: 'ToolGroup' }, ($, e) => {
-      group = { isExpanded: e.props.isExpanded }
+      group = {
+        isExpanded: e.props.isExpanded,
+        ids: e.props.calls.map(call => call.tool_use_id ?? ''),
+      }
       const { Text } = $.ui.resolve(e)
       return <Text>ENGINE</Text>
     })
@@ -356,8 +564,8 @@ describe('lens rendering', () => {
       plugin: 'lens',
       surface: 'terminal',
       component: 'ToolUse',
-      requestId: steps[2]!,
-      props: toolRow(steps[2]!, 'Bash', {}),
+      requestId: steps[3]!,
+      props: toolRow(steps[3]!, 'Edit', {}),
     })
     const fold = await runTwo.drawn()
     // Full width, so the label lines up with the message labels on the right.
@@ -375,10 +583,34 @@ describe('lens rendering', () => {
     expect((runLabel?.children[0] as { props: Record<string, unknown> }).props).toEqual({
       color: 'inactive',
     })
+    await runTwo.press({ key: `step-${steps[3]!}` })
+    expect(await runTwo.find({ key: 'label' })).toBeUndefined()
+    const resultWithFooter = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: steps[3]!,
+      props: {
+        tool_use_id: steps[3]!,
+        tool: 'Edit',
+        output: { structuredPatch: [{ lines: ['-x', '+y'] }] },
+        isErrored: false,
+      },
+    })
+    const resultTree = await resultWithFooter.drawn()
+    expect(resultTree).toMatchObject({
+      type: 'Box',
+      props: { key: 'result-with-label' },
+      children: [
+        { type: 'Text', children: ['ENGINE'] },
+        { type: 'Box', props: { key: 'label', justifyContent: 'flex-end' } },
+      ],
+    })
+    await resultWithFooter.unmount()
 
     await $.command.run({ command: 'lens', args: 'clean' } as never)
-    // A group Claude Code bundled draws the run's fold in its place, in
-    // either state of the engine's own click toggle.
+    // A group Claude Code bundled is expanded natively, so each ToolUse site
+    // decides its own Lens row and mixed known/unknown members are preserved.
     const call = (id: string, tool: string) => ({
       tool_use_id: id,
       tool,
@@ -394,25 +626,293 @@ describe('lens rendering', () => {
         component: 'ToolGroup',
         viewport: { columns: 120, rows: 40, isFullscreen: true },
         props: {
-          calls: [call(steps[2]!, 'Bash'), call(steps[3]!, 'Edit')],
+          calls: [call(steps[2]!, 'Bash'), call(steps[3]!, 'Edit'), call('unseen', 'Read')],
           isActive: false,
           isExpanded,
         },
       })
-      expect((await g.find({ key: 'toggle' }))?.text).toBe('▸ 2 steps · 1 failed')
-      expect(await g.find({ key: 'label' })).toBeDefined()
+      expect(await g.find({ text: 'ENGINE' })).toBeDefined()
       await g.unmount()
     }
-    expect(group).toBeUndefined()
+    expect(group).toEqual({ isExpanded: true, ids: [steps[2]!, steps[3]!, 'unseen'] })
+  })
 
-    // A group of steps the mod never saw unfolds into plain rows.
-    await $.ui.mount({
+  test('open grouped rows keep the run footer with inline native results', async ($, on) => {
+    const steps = await playTurn($, engineBottom(on))
+    await $.command.run({ command: 'lens', args: 'normal' } as never)
+    const call = (id: string, tool: string) => ({
+      tool_use_id: id,
+      tool,
+      input: {},
+      isRunning: false,
+      isErrored: false,
+      isInterrupted: false,
+      output: {},
+    })
+    const group = await $.ui.mount({
       plugin: 'lens',
       surface: 'terminal',
       component: 'ToolGroup',
-      props: { calls: [call('unseen', 'Read')], isActive: false, isExpanded: false },
+      viewport: { columns: 120, rows: 40, isFullscreen: true },
+      props: {
+        calls: [call(steps[2]!, 'Bash'), call(steps[3]!, 'Edit')],
+        isActive: false,
+        isExpanded: false,
+      },
     })
-    expect(group).toEqual({ isExpanded: true })
+    expect(await group.find({ text: 'ENGINE' })).toBeDefined()
+    await group.unmount()
+
+    const lastGrouped = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: steps[3]!,
+      props: toolRow(steps[3]!, 'Edit', {}),
+    })
+    await lastGrouped.press({ key: `step-${steps[3]!}` })
+    expect(await lastGrouped.find({ text: 'ENGINE' })).toBeDefined()
+    expect((await lastGrouped.find({ key: 'label' }))?.text).toMatch(/^Opus 5\.5 · \d\d:\d\d$/)
+  })
+
+  test('native delegation preserves large and old details', async ($, on) => {
+    let nativeToolUse: { input: unknown; output: unknown; tool_use_id: string } | undefined
+    let nativeResult: unknown
+    on('ui.render', { component: 'ToolUse' }, ($, e) => {
+      nativeToolUse = {
+        input: e.props.input,
+        output: e.props.output,
+        tool_use_id: e.props.tool_use_id,
+      }
+      const { Text } = $.ui.resolve(e)
+      return <Text>NATIVE TOOL</Text>
+    })
+    on('ui.render', { component: 'ToolResult' }, ($, e) => {
+      nativeResult = e.props.output
+      const { Text } = $.ui.resolve(e)
+      return <Text>NATIVE RESULT</Text>
+    })
+    const bottom = engineBottom(on)
+    await $.command.run({ command: 'lens', args: 'normal' } as never)
+    await $.turn.start({ text: 'large', turnId: 'turn-large' })
+    const longCommand = `printf ${'x'.repeat(5000)}`
+    await $.tool.call({ tool: 'Bash', command: longCommand, description: 'Print a lot' })
+    const longOutput = {
+      stdout: Array.from({ length: 2101 }, (_, n) => `${n}: ${'o'.repeat(20)}`).join('\n'),
+      stderr: 'e'.repeat(25_000),
+      interrupted: false,
+    }
+    const ui = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[0]!,
+      props: {
+        ...toolRow(bottom.ids[0]!, 'Bash', { command: longCommand }),
+        output: longOutput,
+      },
+    })
+    await ui.press({ key: `step-${bottom.ids[0]!}` })
+    expect(nativeToolUse?.input).toEqual({ command: longCommand })
+    expect(nativeToolUse?.output).toEqual(longOutput)
+
+    const closedResult = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: 'closed-result',
+      props: { tool_use_id: 'closed-result', tool: 'Bash', output: longOutput, isErrored: false },
+    })
+    expect(await closedResult.find({ key: 'folded' })).toBeDefined()
+    expect(nativeResult).toBeUndefined()
+    await closedResult.unmount()
+
+    const result = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: bottom.ids[0]!,
+      props: { tool_use_id: bottom.ids[0]!, tool: 'Bash', output: longOutput, isErrored: false },
+    })
+    expect(await result.find({ text: 'NATIVE RESULT' })).toBeDefined()
+    expect(nativeResult).toEqual(longOutput)
+    await ui.press({ key: `step-${bottom.ids[0]!}` })
+    await result.unmount()
+    const collapsedResult = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: bottom.ids[0]!,
+      props: { tool_use_id: bottom.ids[0]!, tool: 'Bash', output: longOutput, isErrored: false },
+    })
+    expect(await collapsedResult.find({ key: 'folded' })).toBeDefined()
+    await collapsedResult.unmount()
+
+    const largePatch = {
+      structuredPatch: [
+        {
+          oldStart: 1,
+          oldLines: 250,
+          newStart: 1,
+          newLines: 250,
+          lines: Array.from({ length: 250 }, (_, n) => (n % 2 === 0 ? `-${n}` : `+${n}`)),
+        },
+      ],
+    }
+    await $.turn.start({ text: 'diff', turnId: 'turn-diff' })
+    await $.tool.call({ tool: 'Edit', file_path: '/p/large.ts', old_string: 'x', new_string: 'y' })
+    const diffId = bottom.ids[1]!
+    const diff = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: diffId,
+      props: { ...toolRow(diffId, 'Edit', { file_path: '/p/large.ts' }), output: largePatch },
+    })
+    await diff.press({ key: `step-${diffId}` })
+    expect(nativeToolUse?.output).toEqual(largePatch)
+
+    const customOutput = {
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'abc' } },
+        { type: 'button', label: 'Open details', value: 'open' },
+      ],
+    }
+    await $.turn.start({ text: 'custom output', turnId: 'turn-custom-output' })
+    await $.tool.call({ tool: 'mcp__demo__image_tool', value: 1 } as never)
+    const customId = bottom.ids[2]!
+    const custom = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: customId,
+      props: {
+        ...toolRow(customId, 'mcp__demo__image_tool', { value: 1 }),
+        output: customOutput,
+      },
+    })
+    await custom.press({ key: `step-${customId}` })
+    expect(nativeToolUse?.output).toEqual(customOutput)
+
+    const oldStart = bottom.ids.length
+    await $.turn.start({ text: 'old', turnId: 'turn-old' })
+    for (let n = 0; n < 601; n += 1) await $.tool.call({ tool: 'Read', file_path: `/p/${n}.ts` })
+    const oldId = bottom.ids[oldStart]!
+    const old = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: oldId,
+      props: {
+        ...toolRow(oldId, 'Read', { file_path: '/p/0.ts' }),
+        output: { type: 'text', file: { numLines: 1 } },
+      },
+    })
+    expect((await old.find({ key: `step-${oldId}` }))?.text).toBe('▸ ✓ Read 0.ts · 1 line')
+    await old.press({ key: `step-${oldId}` })
+    expect(await old.find({ text: 'NATIVE TOOL' })).toBeDefined()
+    await diff.unmount()
+    await custom.unmount()
+  })
+
+  test('collapsed read, running, custom and historical rows open native details', async ($, on) => {
+    const bottom = engineBottom(on)
+    await $.command.run({ command: 'lens', args: 'normal' } as never)
+    bottom.whileRunning = async () => {
+      const runningId = bottom.ids.at(-1)!
+      const running = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolUse',
+        requestId: runningId,
+        props: {
+          ...toolRow(runningId, 'Bash', { command: 'sleep 1' }),
+          isRunning: true,
+          output: undefined,
+        },
+      })
+      expect((await running.find({ key: `step-${runningId}` }))?.text).toBe('▸ … Wait briefly')
+      await running.press({ key: `step-${runningId}` })
+      expect(await running.find({ text: 'ENGINE' })).toBeDefined()
+      expect((await running.find({ key: 'label' }))?.text).toMatch(/^Claude · \d\d:\d\d$/)
+      await running.unmount()
+      bottom.whileRunning = undefined
+    }
+    await $.turn.start({ text: 'running', turnId: 'turn-running' })
+    await $.tool.call({ tool: 'Bash', command: 'sleep 1', description: 'Wait briefly' })
+    const completedRunning = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: bottom.ids[0]!,
+      props: toolRow(bottom.ids[0]!, 'Bash', { command: 'sleep 1' }),
+    })
+    expect((await completedRunning.find({ key: `step-${bottom.ids[0]!}` }))?.text).toBe(
+      '▾ ✓ Wait briefly · exit 0',
+    )
+    expect(await completedRunning.find({ text: 'ENGINE' })).toBeDefined()
+
+    await $.turn.start({ text: 'read', turnId: 'turn-native' })
+    await $.tool.call({ tool: 'Read', file_path: '/p/native.ts' })
+    const readId = bottom.ids[1]!
+    const read = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: readId,
+      props: toolRow(readId, 'Read', { file_path: '/p/native.ts' }),
+    })
+    expect((await read.find({ key: `step-${readId}` }))?.text).toBe('▸ ✓ Read native.ts · 12 lines')
+    await read.press({ key: `step-${readId}` })
+    expect(await read.find({ text: 'ENGINE' })).toBeDefined()
+
+    await $.turn.start({ text: 'custom', turnId: 'turn-custom' })
+    await $.tool.call({ tool: 'mcp__demo__custom_tool', value: 1 } as never)
+    const customId = bottom.ids[2]!
+    const custom = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: customId,
+      props: toolRow(customId, 'mcp__demo__custom_tool', { value: 1 }),
+    })
+    expect((await custom.find({ key: `step-${customId}` }))?.text).toBe(
+      '▸ ✓ Used demo: custom tool',
+    )
+    await custom.press({ key: `step-${customId}` })
+    expect(await custom.find({ text: 'ENGINE' })).toBeDefined()
+
+    const historical = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: 'old-read',
+      props: {
+        ...toolRow('old-read', 'Read', { file_path: '/p/old.ts' }),
+        output: { type: 'text', file: { numLines: 8 } },
+      },
+    })
+    expect((await historical.find({ key: 'step-old-read' }))?.text).toBe(
+      '▸ ✓ Read old.ts · 8 lines',
+    )
+    await historical.press({ key: 'step-old-read' })
+    expect(await historical.find({ text: 'ENGINE' })).toBeDefined()
+
+    const interrupted = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: 'old-interrupted',
+      props: {
+        ...toolRow('old-interrupted', 'Bash', { command: 'sleep 10' }),
+        isInterrupted: true,
+        output: undefined,
+      },
+    })
+    expect((await interrupted.find({ key: 'step-old-interrupted' }))?.text).toBe(
+      '▸ ◌ Ran a shell command',
+    )
+    expect(await interrupted.find({ text: /exit 0/ })).toBeUndefined()
   })
 
   test('raw restores the engine drawing everywhere', async ($, on) => {
@@ -568,14 +1068,57 @@ describe('lens rendering', () => {
       },
     })
     expect((await question.find({ key: 'question-toggle' }))?.text).toBe('? Answered Scope: User')
+    const closedQuestionResult = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: 'q-1',
+      props: {
+        tool_use_id: 'q-1',
+        tool: 'AskUserQuestion',
+        output: { response: 'User' },
+        isErrored: false,
+      },
+    })
+    expect(await closedQuestionResult.find({ key: 'folded' })).toBeDefined()
+    await closedQuestionResult.unmount()
     // A click shows the question and the answer in full.
     await question.press({ key: 'question-toggle' })
     expect((await question.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
       'Scope: Which scope?',
       '→ User',
+      'ENGINE',
     ])
+    const openQuestionResult = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: 'q-1',
+      props: {
+        tool_use_id: 'q-1',
+        tool: 'AskUserQuestion',
+        output: { response: 'User' },
+        isErrored: false,
+      },
+    })
+    expect(await openQuestionResult.find({ text: 'ENGINE' })).toBeDefined()
+    await openQuestionResult.unmount()
     await question.press({ key: 'question-toggle' })
     expect(await question.findAll({ type: 'Text' })).toHaveLength(0)
+    const reclosedQuestionResult = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolResult',
+      requestId: 'q-1',
+      props: {
+        tool_use_id: 'q-1',
+        tool: 'AskUserQuestion',
+        output: { response: 'User' },
+        isErrored: false,
+      },
+    })
+    expect(await reclosedQuestionResult.find({ key: 'folded' })).toBeDefined()
+    await reclosedQuestionResult.unmount()
   })
 
   test('the spinner shows the current step; command errors are relabeled', async ($, on) => {

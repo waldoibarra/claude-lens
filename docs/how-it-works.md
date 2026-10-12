@@ -22,8 +22,8 @@ Drawing a fold needs facts the render hooks do not carry, such as which run a to
 and what it returned. Lens records them as they happen:
 
 - **Steps:** each main-conversation tool call, with its run, label, status, start time, the model
-  whose reply called it, one fact from its result, and for the 150 most recent steps its output or
-  diff. Lens keeps the last 600 steps.
+  whose reply called it, and one fact from its result. Lens keeps the last 600 step summaries, but
+  not copied outputs or diffs.
 - **Message stamps:** the time of each prompt and reply, and the replying model.
 - **Your choices:** the current view and which runs and steps are open.
 
@@ -33,8 +33,8 @@ session. Tool calls made inside a sub-agent are not recorded as steps; the deleg
 ## Limits
 
 - **Earlier turns:** turns from before Lens loaded, or from a resumed session, have no recorded
-  steps. Each of their steps shows as one plain line, and their messages show a label without a
-  time.
+  steps. Each of their steps shows as one plain line that can open its native detail when Claude
+  Code still provides that detail, and their messages show a label without a time.
 - **Ctrl+O detection:** the plugin API marks the Ctrl+O transcript only on user messages and
   grouped tool calls. When one of those says the Ctrl+O view is open, Lens draws everything
   unchanged for the next 3 seconds. A long Ctrl+O view scrolled to a turn with no user message on
@@ -44,6 +44,15 @@ session. Tool calls made inside a sub-agent are not recorded as steps; the deleg
   Claude Code's own behavior and the plugin cannot turn it off.
 - **Main screen:** Lens is developed and tested in the fullscreen interface. On the classic main
   screen, finished rows may not redraw as later steps arrive; this is untested.
+- **Native detail:** Lens opens steps by delegating to Claude Code's native `ToolUse` and
+  `ToolResult` render sites. It adds no output, diff, command-length or age cap. Native rendering
+  may still have host limits; the generated 2.1.294 API does not declare a prop that forces every
+  tool to draw a Ctrl+O-equivalent expanded body. Renderer completeness needs a real Claude Code
+  host check; the mocked test engine cannot prove it.
+- **Viewport anchoring:** Lens inserts expanded rows below the clicked header, but Claude Code owns
+  transcript scrolling. The generated 2.1.294 API exposes read-only `onScreen` facts and
+  scroll-into-view calls, not a hook to pin existing rows or disable follow-end. Exact peek-style
+  anchoring still needs a real host check and may differ from Pi Lens.
 - **Facts:** a background sub-agent shows no duration, because its result returns before it
   finishes. Builds without separate search tools show searches as commands, with an exit code
   instead of a match count.

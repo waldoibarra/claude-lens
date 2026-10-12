@@ -20,20 +20,24 @@ turn that reads two files, says something, then runs a command has two runs.
 I'll check the config, then run the tests.
                                                            Opus 5.5 · 10:22
 • Read 2 files, ran 1 command (1 failed)
-  ✓ Read config.ts · 34 lines
-  ✓ Read package.json · 41 lines
-  ✗ Run the tests · exit 1
+  ▸ ✓ Read config.ts · 34 lines
+  ▸ ✓ Read package.json · 41 lines
+  ▸ ✗ Run the tests · exit 1
     The command failed (exit 1). Press Ctrl+O to see its output.
     npm ERR! Missing script: "tset"
                                                     Opus 5.5 · 10:22 (gray)
 ```
 
 - The count line totals each kind of step: files read, files changed, commands, searches, web
-  lookups, delegated tasks, skills and integrations.
+  lookups, delegated tasks, skills and integrations. It is informational, not clickable, and a
+  one-step run omits it.
 - Each step shows a plain label and one fact from its result: `exit 0`, `34 lines`, `+2 −1 lines`,
   the sub-agent's model and duration, or a web page's domain. A fact the result does not carry is
-  left off.
+  left off. Expandable steps start with `▸`; opened steps start with `▾`.
 - A run shows its first 5 steps. Click `+N more` to show the rest and `show fewer` to go back.
+  The toggle stays after the fifth step, so expansion inserts extra rows below it. If a hidden
+  step is currently running, the count line names that observed step without making the count
+  interactive.
 - A failed step adds a plain line saying what happened and what to do, then the raw error's first
   line in gray, with paths shortened to the file name.
 
@@ -63,15 +67,16 @@ exactly as Claude Code shows it without Lens.
 - **Message labels:** a right-aligned line under each message: `You · 10:20` under your prompts,
   the replying model under each block of Claude's reply (`Opus 5.5 · 10:22`), and a gray label
   under each run with the model that called its steps and the time the run started. The model is
-  read per reply, so a `/model` switch shows on the next reply. Claude Code's `●` bullet is
-  dropped, since the label marks each message.
+  read per reply, so a `/model` switch shows on the next reply. Known non-Claude model ids are
+  humanized, unknown identifiers stay unchanged, and missing model metadata shows `Claude`.
+  Claude Code's `●` bullet is dropped, since the label marks each message.
 - **Plain step labels:** a step reads `Run the tests`, `Edited README.md` or `Delegated: Find
   usages`, never the raw command, the full path, or a tool call ID. Commands use the description
   Claude gave them.
 - **Plain errors:** raw errors become one line that says what happened and what to do. See
   [Error lines](#error-lines).
-- **Click to open a step:** an edit opens its diff, a command opens its command in a bordered box
-  with the full output under it, and a failed step opens its full error text. Click again to close.
+- **Click to open a step:** a `▸` step asks Claude Code to draw that step's native detail row in
+  place and changes to `▾`. Click again to close.
 - **Answered questions:** a question Claude asked you folds to one line, such as `? Answered Scope:
   User`. Click it to see each question and your answer.
 - **Working line:** while a step runs, the spinner shows its label instead of a random verb.
@@ -104,8 +109,14 @@ A failed slash command's output is relabeled the same way.
 
 - **Ctrl+O** opens Claude Code's full transcript, which Lens leaves untouched.
 - **`/lens raw`** shows the whole transcript without Lens.
-- Clicking a step shows up to 2,000 lines or 20,000 characters of output. Longer output ends with a
-  line pointing to Ctrl+O.
+- Clicking a step delegates to Claude Code's native detail renderer for that original row. Lens does
+  not copy command output, diffs or read results, and adds no line, character or age cap.
+- Native details can still be limited by Claude Code itself. In the generated 2.1.294 plugin API,
+  hooks can request native `ToolUse`, `ToolResult` and expanded `ToolGroup` rendering, but there is
+  no prop that promises a Ctrl+O-equivalent expanded body for every tool.
+- Pi Lens shares this visual target where Pi's host allows it. Its source-only, unreleased public
+  repository is <https://github.com/waldoibarra/pi-lens>; host-specific thinking and viewport
+  behavior can still differ.
 
 Read [How it works](/docs/how-it-works.md) before relying on Ctrl+O, timestamps or clicks in an
 unusual setup.

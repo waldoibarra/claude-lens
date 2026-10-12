@@ -7,10 +7,7 @@ import {
   anchorId,
   cleanFoldLine,
   foldOf,
-  diffOf,
-  KEEP_DETAIL_STEPS,
   formatTime,
-  outputOf,
   modelName,
   NORMAL_MAX_STEPS,
   normalRunLine,
@@ -63,6 +60,7 @@ const textOf = (content: unknown): string =>
       : ''
 
 let transcriptSeenAt = 0
+let groupedToolUseIds: string[] = []
 function transcriptOpen(): boolean {
   return Date.now() - transcriptSeenAt < TRANSCRIPT_WINDOW_MS
 }
@@ -77,24 +75,35 @@ function toggle($: Dollar, key: string) {
   )
 }
 
-// A run's fold, drawn on the run's first step; every other row draws nothing.
-// Clean: the step count alone, a click lists the names. Normal: the counts,
-// then up to NORMAL_MAX_STEPS steps with one fact each; a click lists all.
-// A step opens on click when there is something to show: a diff, a
-// command, or output.
-function canOpen(s: Step) {
-  return s.diff !== undefined || s.command !== undefined || s.output !== undefined
+type ToolUseInput = RenderInput<'ToolUse'>
+type ToolUseNext = (e: ToolUseInput) => Promise<RenderElement>
+
+const stepOpenKey = (id: string): string => `step:${id}`
+const questionOpenKey = (id: string): string => `q:${id}`
+
+function visibleSteps(all: readonly Step[], step: Step, v: LensView, openKeys: readonly string[]) {
+  const fold = foldOf(all, step, 'run')
+  const runOpen = openKeys.includes(`${step.turn}#${step.run}`)
+  return v === 'clean'
+    ? runOpen
+      ? fold.steps
+      : []
+    : runOpen
+      ? fold.steps
+      : fold.steps.slice(0, NORMAL_MAX_STEPS)
 }
 
-// Output and diffs are the bulk of the stored steps: only the most recent
-// KEEP_DETAIL_STEPS keep them.
-function keepRecentDetail(list: Step[]): Step[] {
-  const cutoff = list.length - KEEP_DETAIL_STEPS
-  return list.map((s, n) => {
-    if (n >= cutoff || (s.output === undefined && s.diff === undefined)) return s
-    const { output: _output, diff: _diff, ...rest } = s
-    return rest
-  })
+function isVisibleStep(all: readonly Step[], step: Step, v: LensView, openKeys: readonly string[]) {
+  return visibleSteps(all, step, v, openKeys).some(s => s.id === step.id)
+}
+
+function isLastVisibleStep(
+  all: readonly Step[],
+  step: Step,
+  v: LensView,
+  openKeys: readonly string[],
+) {
+  return visibleSteps(all, step, v, openKeys).at(-1)?.id === step.id
 }
 
 // The facts after a step's label: a sub-agent's model (both views), then in
@@ -107,121 +116,124 @@ function stepFacts(s: Step, isClean: boolean) {
   return facts.length > 0 ? ` · ${facts.join(' · ')}` : ''
 }
 
-async function drawFold(
+function statusOf(p: ToolUseInput['props']): Step['status'] {
+  return p.isRunning ? 'running' : p.isInterrupted ? 'interrupted' : p.isErrored ? 'error' : 'ok'
+}
+
+async function nativeToolUse(
   $: Dollar,
-  e: RenderInput<'ToolUse' | 'ToolGroup'>,
+  e: ToolUseInput,
+  next: ToolUseNext,
+): Promise<RenderElement> {
+  const { Box } = $.ui.resolve(e)
+  return (
+    <Box key={`native-${e.props.tool_use_id}`} flexDirection="column" paddingLeft={2}>
+      {await next(e)}
+    </Box>
+  )
+}
+
+async function drawToolUseStep(
+  $: Dollar,
+  e: ToolUseInput,
   all: readonly Step[],
   step: Step,
   v: LensView,
+  next: ToolUseNext,
 ) {
-  const { Box, Text, Button, Code } = $.ui.resolve(e)
-  if (anchorId(all, step, 'run') !== step.id) return <Box key="folded" />
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const anchor = anchorId(all, step, 'run')
+  const isAnchor = anchor === step.id
   const fold = foldOf(all, step, 'run')
   const key = `${step.turn}#${step.run}`
   const openKeys = await read($, expanded)
-  const open = openKeys.includes(key)
+  const runOpen = openKeys.includes(key)
   const isClean = v === 'clean'
-  const line = isClean ? cleanFoldLine(fold, open) : normalRunLine(fold)
-  const shown = isClean
-    ? open
-      ? fold.steps
-      : []
-    : open
-      ? fold.steps
-      : fold.steps.slice(0, NORMAL_MAX_STEPS)
-  const hidden = fold.steps.length - shown.length
+  const shown = visibleSteps(all, step, v, openKeys)
+  const isVisible = shown.some(s => s.id === step.id)
+  const totalHidden = Math.max(0, fold.steps.length - NORMAL_MAX_STEPS)
+  const currentHidden =
+    !isClean && !runOpen
+      ? fold.steps.find((s, index) => index >= NORMAL_MAX_STEPS && s.status === 'running')
+      : undefined
+  const lastPreview = fold.steps[Math.min(fold.steps.length, NORMAL_MAX_STEPS) - 1]?.id
+  const drawsToggleAfterPreview = !isClean && totalHidden > 0 && lastPreview === step.id
+  const lastVisible = shown.at(-1)?.id
+  const drawsAfterRun = shown.length === 0 ? isAnchor : lastVisible === step.id
+  const stepOpen = openKeys.includes(stepOpenKey(step.id))
+  const inlineGroupedResult = groupedToolUseIds.includes(step.id)
+  // The API says expanded ToolGroup rows draw results inline on ToolUse,
+  // while standalone rows own a separate ToolResult. Running rows have no result yet.
+  const footerFollowsResult =
+    isVisible && stepOpen && drawsAfterRun && !inlineGroupedResult && step.status !== 'running'
+  if (!isAnchor && !isVisible && !drawsAfterRun) return <Box key="folded" display="none" />
+
   const first = fold.steps[0]
   const runLabel =
-    first?.at === undefined
-      ? undefined
-      : await stampLabel($, null, {
+    drawsAfterRun && !footerFollowsResult && first?.at !== undefined
+      ? await stampLabel($, null, {
           id: first.id,
           key: '',
           at: first.at,
           ...(first.model ? { model: first.model } : {}),
         })
+      : undefined
+
   return (
     <Box key="fold" flexDirection="column" width="100%">
-      {isClean || open || hidden > 0 ? (
-        <Button key="toggle" plain dimColor label={line} onPress={() => toggle($, key)} />
-      ) : (
-        <Box key="line">
-          <Text color="inactive">{line}</Text>
-        </Box>
-      )}
-      {shown.map(s => (
+      {isAnchor &&
+        (isClean ? (
+          <Button
+            key="toggle"
+            plain
+            dimColor
+            label={cleanFoldLine(fold, runOpen)}
+            onPress={() => toggle($, key)}
+          />
+        ) : fold.steps.length > 1 ? (
+          <Box key="line">
+            <Text color="inactive">{normalRunLine(fold, currentHidden?.label)}</Text>
+          </Box>
+        ) : null)}
+      {isVisible && (
         <Box flexDirection="column" paddingLeft={2}>
-          {canOpen(s) ? (
-            <Button
-              key={`step-${s.id}`}
-              plain
-              dimColor
-              label={`${statusGlyph(s.status)} ${s.label}${stepFacts(s, isClean)}`}
-              onPress={() => toggle($, `step:${s.id}`)}
-            />
-          ) : (
-            <Text color={s.status === 'error' ? 'error' : 'inactive'} wrap="truncate-end">
-              {statusGlyph(s.status)} {s.label}
-              {stepFacts(s, isClean)}
-            </Text>
-          )}
-          {s.error && (
+          <Button
+            key={`step-${step.id}`}
+            plain
+            dimColor
+            label={`${stepOpen ? '▾' : '▸'} ${statusGlyph(step.status)} ${step.label}${stepFacts(
+              step,
+              isClean,
+            )}`}
+            onPress={() => toggle($, stepOpenKey(step.id))}
+          />
+          {step.error && (
             <Text color="error" wrap="truncate-end">
               {'  '}
-              {s.error}
+              {step.error}
             </Text>
           )}
-          {!isClean && s.rawError && (
+          {!isClean && step.rawError && (
             <Text color="inactive" wrap="truncate-end">
               {'  '}
-              {s.rawError}
+              {step.rawError}
             </Text>
           )}
-          {canOpen(s) && openKeys.includes(`step:${s.id}`) && (
-            <Box key={`open-${s.id}`} flexDirection="column" paddingLeft={2}>
-              {s.diff ? (
-                <Code source={s.diff} format="diff" />
-              ) : s.command !== undefined ? (
-                <Box flexDirection="column">
-                  <Box borderStyle="round" borderColor="inactive" paddingX={1}>
-                    <Code source={`$ ${s.command}`} language="bash" />
-                  </Box>
-                  {s.output ? (
-                    <Code source={s.output} />
-                  ) : (
-                    <Text color="inactive">(no output)</Text>
-                  )}
-                </Box>
-              ) : (
-                <Code source={s.output ?? ''} />
-              )}
-            </Box>
-          )}
+          {stepOpen && (await nativeToolUse($, e, next))}
         </Box>
-      ))}
-      {!isClean && hidden > 0 && (
-        <Box key="more" paddingLeft={2}>
+      )}
+      {drawsToggleAfterPreview && (
+        <Box key={runOpen ? 'fewer' : 'more'} paddingLeft={2}>
           <Button
-            key="more-toggle"
+            key={runOpen ? 'fewer-toggle' : 'more-toggle'}
             plain
             dimColor
-            label={`+${hidden} more`}
+            label={runOpen ? 'show fewer' : `+${totalHidden} more`}
             onPress={() => toggle($, key)}
           />
         </Box>
       )}
-      {!isClean && open && fold.steps.length > NORMAL_MAX_STEPS && (
-        <Box key="fewer" paddingLeft={2}>
-          <Button
-            key="fewer-toggle"
-            plain
-            dimColor
-            label="show fewer"
-            onPress={() => toggle($, key)}
-          />
-        </Box>
-      )}
-      {isClean && !open && fold.lastError && (
+      {drawsAfterRun && isClean && !runOpen && fold.lastError && (
         <Text color="error" wrap="truncate-end">
           {'  ✗ '}
           {fold.lastError}
@@ -232,6 +244,44 @@ async function drawFold(
           <Text color="inactive">{runLabel}</Text>
         </Box>
       )}
+    </Box>
+  )
+}
+
+async function drawHistoricalToolUse($: Dollar, e: ToolUseInput, next: ToolUseNext) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const p = e.props
+  const key = stepOpenKey(p.tool_use_id)
+  const open = (await read($, expanded)).includes(key)
+  const status = statusOf(p)
+  const failure = p.isErrored
+    ? typeof p.output === 'string'
+      ? p.output
+      : undefined
+    : p.isInterrupted
+      ? typeof p.output === 'string'
+        ? p.output
+        : 'interrupted'
+      : undefined
+  const detail = p.isRunning ? undefined : stepDetail(p.tool, p.input, p.output, failure)
+  return (
+    <Box key="historical" flexDirection="column" width="100%">
+      <Button
+        key={`step-${p.tool_use_id}`}
+        plain
+        dimColor
+        label={`${open ? '▾' : '▸'} ${statusGlyph(status)} ${stepLabel(p.tool, p.input)}${
+          detail ? ` · ${detail}` : ''
+        }`}
+        onPress={() => toggle($, key)}
+      />
+      {status === 'error' && (
+        <Text color="error">
+          {'  '}
+          {relabelError(p.output)}
+        </Text>
+      )}
+      {open && (await nativeToolUse($, e, next))}
     </Box>
   )
 }
@@ -394,22 +444,14 @@ export const register: Register = on => {
     const detail = stepDetail(e.tool, e, ran.result, failure)
     const agent =
       e.tool === 'Agent' || String(e.tool) === 'Task' ? agentOf(ran.result, ran.text) : {}
-    const diff = failure === undefined ? diffOf(e.tool, ran.result) : undefined
-    const output = diff ? undefined : outputOf(e.tool, ran.result, failure)
-    const command = e.tool === 'Bash' ? e.command.slice(0, 4000) : undefined
     const facts = {
       ...agent,
-      ...(command ? { command } : {}),
-      ...(diff ? { diff } : {}),
-      ...(output ? { output } : {}),
       ...(detail ? { detail } : {}),
       ...(status === 'error'
         ? { error: relabelError(failure), rawError: rawErrorLine(failure) }
         : {}),
     }
-    await update($, steps, list =>
-      keepRecentDetail(list.map(s => (s.id === id ? { ...s, status, ...facts } : s))),
-    )
+    await update($, steps, list => list.map(s => (s.id === id ? { ...s, status, ...facts } : s)))
     await update($, current, now => (now === label ? null : now))
     return ran
   }).catch(($, e, next) => next(e))
@@ -417,22 +459,15 @@ export const register: Register = on => {
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     const v = await read($, view)
     if (v === 'raw' || transcriptOpen()) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const p = e.props
 
     if (p.tool === 'AskUserQuestion') {
       if (p.isRunning) return <Text dimColor>? Waiting for your answer…</Text>
-      const { Button } = $.ui.resolve(e)
-      const key = `q:${p.tool_use_id}`
+      const key = questionOpenKey(p.tool_use_id)
       const open = (await read($, expanded)).includes(key)
       const pairs = questionPairs(p.input, p.output)
       const line = questionLine(p.output, p.isErrored)
-      if (pairs.length === 0)
-        return (
-          <Text dimColor wrap="truncate-end">
-            {line}
-          </Text>
-        )
       return (
         <Box key="question" flexDirection="column" width="100%">
           <Button
@@ -449,67 +484,81 @@ export const register: Register = on => {
                 <Text>{`→ ${q.answer}`}</Text>
               </Box>
             ))}
+          {open && (await nativeToolUse($, e, next))}
         </Box>
       )
     }
 
     const all = await read($, steps)
     const step = all.find(s => s.id === p.tool_use_id)
-    if (step) return drawFold($, e, all, step, v)
+    if (step) return drawToolUseStep($, e, all, step, v, next)
 
-    // A row from before this mod saw the session (a resume): one plain line.
-    const status = p.isRunning
-      ? 'running'
-      : p.isInterrupted
-        ? 'interrupted'
-        : p.isErrored
-          ? 'error'
-          : 'ok'
-    return (
-      <Box flexDirection="column">
-        <Text dimColor>
-          {statusGlyph(status)} {stepLabel(p.tool, p.input)}
-        </Text>
-        {status === 'error' && (
-          <Text color="error">
-            {'  '}
-            {relabelError(p.output)}
-          </Text>
-        )}
-      </Box>
-    )
+    return drawHistoricalToolUse($, e, next)
   })
 
-  // Claude Code's own grouped rows (`Listed 1 directory`) draw the run's
-  // fold in their place, whatever the engine's own click toggle says: a
-  // group the person collapsed by clicking would otherwise draw the
-  // engine's summary. Only the non-fullscreen ctrl+o transcript (the one
-  // place a group arrives expanded for that reason) passes through.
+  // Grouped native rows are unfolded so each original ToolUse site can decide
+  // whether to show its Lens header, hide itself, or delegate native detail.
+  // This preserves unknown siblings in mixed observed/historical groups.
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
     const isTranscript = e.props.isExpanded && e.viewport?.isFullscreen === false
     if (isTranscript) transcriptSeenAt = Date.now()
     const v = await read($, view)
     if (v === 'raw' || isTranscript || transcriptOpen()) return next(e)
-    const all = await read($, steps)
-    const mine = e.props.calls
-      .map(call => all.find(s => s.id === call.tool_use_id))
-      .filter((s): s is Step => s !== undefined)
-    const anchor = mine.find(s => anchorId(all, s, 'run') === s.id)
-    if (anchor) return drawFold($, e, all, anchor, v)
-    if (mine.length > 0) {
-      const { Box } = $.ui.resolve(e)
-      return <Box key="folded" />
+    const groupIds = e.props.calls
+      .map(call => call.tool_use_id)
+      .filter((id): id is string => typeof id === 'string')
+    if (groupIds.length > 0) {
+      groupedToolUseIds = [
+        ...groupedToolUseIds.filter(id => !groupIds.includes(id)),
+        ...groupIds,
+      ].slice(-MAX_STEPS)
     }
-    // Steps from before the mod saw them: one plain row each.
     return next({ ...e, props: { ...e.props, isExpanded: true } })
   })
 
-  // A standalone row's result block: the fold says what happened instead.
+  // A standalone row's result block stays hidden until its visible ToolUse row is open.
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
     const v = await read($, view)
     if (v === 'raw' || transcriptOpen()) return next(e)
-    const { Box } = $.ui.resolve(e)
-    return <Box key="folded" />
+    const openKeys = await read($, expanded)
+    const { Box, Text } = $.ui.resolve(e)
+    const id = e.props.tool_use_id
+    if (e.props.tool === 'AskUserQuestion') {
+      if (!openKeys.includes(questionOpenKey(id))) return <Box key="folded" display="none" />
+      return next(e)
+    }
+
+    const all = await read($, steps)
+    const step = all.find(s => s.id === id)
+    if (!step) {
+      if (openKeys.includes(stepOpenKey(id))) return next(e)
+      return <Box key="folded" display="none" />
+    }
+    if (!openKeys.includes(stepOpenKey(id)) || !isVisibleStep(all, step, v, openKeys))
+      return <Box key="folded" display="none" />
+
+    const result = await next(e)
+    if (!isLastVisibleStep(all, step, v, openKeys)) return result
+    const first = foldOf(all, step, 'run').steps[0]
+    const runLabel =
+      first?.at === undefined
+        ? undefined
+        : await stampLabel($, null, {
+            id: first.id,
+            key: '',
+            at: first.at,
+            ...(first.model ? { model: first.model } : {}),
+          })
+    return runLabel ? (
+      <Box key="result-with-label" flexDirection="column" width="100%">
+        {result}
+        <Box key="label" justifyContent="flex-end">
+          <Text color="inactive">{runLabel}</Text>
+        </Box>
+      </Box>
+    ) : (
+      result
+    )
   })
 
   // Labels sit under each message, right-aligned, in clean and normal alike: a row below
@@ -538,7 +587,7 @@ export const register: Register = on => {
   })
 
   // The label marks each message, so the engine's bullet is dropped. Text
-  // blocks carry a coloured label; runs of steps a gray one (drawFold).
+  // blocks carry a coloured label; runs of steps a gray one.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     const v = await read($, view)
     if (v === 'raw' || transcriptOpen()) return next(e)

@@ -40,9 +40,9 @@ The same turn: Claude reads two files and runs the tests, which fail.
 I'll check the config, then run the tests.
                                                            Opus 5.5 · 10:22
 • Read 2 files, ran 1 command (1 failed)
-  ✓ Read config.ts · 34 lines
-  ✓ Read package.json · 41 lines
-  ✗ Run the tests · exit 1
+  ▸ ✓ Read config.ts · 34 lines
+  ▸ ✓ Read package.json · 41 lines
+  ▸ ✗ Run the tests · exit 1
     The command failed (exit 1). Press Ctrl+O to see its output.
     npm ERR! Missing script: "tset"
                                                     Opus 5.5 · 10:22 (gray)
@@ -62,8 +62,7 @@ I'll check the config, then run the tests.
                                                     Opus 5.5 · 10:22 (gray)
 ```
 
-Click a step and it opens in place: the command in a box with its full output under it, or the
-diff of an edit.
+Click a step and it opens Claude Code's own detail row in place, without Lens-added truncation.
 
 ## Install
 
@@ -84,20 +83,22 @@ Lens needs Claude Code 2.1.287 or later, the release that added Claude Mods; it 
 - **Three views, one command:** normal by default; `/lens clean` strips the transcript to replies
   and failures for distraction-free reading; `/lens raw` shows Claude Code's own drawing. Each
   redraws the whole transcript, earlier turns included.
-- **Folded runs:** each group of back-to-back tool calls becomes one line with counts. Long runs
-  show 5 steps and a `+N more` you can click.
+- **Folded runs:** normal shows inert counts for back-to-back tool calls, except single-step runs.
+  Long runs show 5 steps and a `+N more` you can click.
 - **Plain labels:** `Run the tests` and `Edited README.md`, never the raw command, the full path or
   a tool call ID.
 - **Plain errors:** raw errors become one line that says what happened and what to do, across 15
   kinds of failure.
-- **Click to open:** commands show what ran and the full output, edits show their diff, and failed
-  steps show the full error.
+- **Click to open:** `▸` steps delegate to Claude Code's native detail row, so Lens adds no
+  output, diff or age cap.
 - **Message labels:** your prompts and Claude's replies get a right-aligned label with the time and,
   for replies, the model that wrote them, so a `/model` switch is visible where it happened.
 - **Answered questions:** a question Claude asked folds to one line; click it to see the question
   and your answer.
 - **A working line:** while a step runs, the spinner names it.
 - **Sub-agents:** a delegated step shows the model the agent ran on.
+
+Use Pi instead of Claude Code? The source-only, unreleased sibling is [Pi Lens](https://github.com/waldoibarra/pi-lens).
 
 Read [Views](/docs/views.md) before picking a view; it shows each one and lists every error line.
 
@@ -112,9 +113,12 @@ Read [Views](/docs/views.md) before picking a view; it shows each one and lists 
 ## Notes
 
 - Lens is built for the fullscreen interface (`/tui fullscreen`), where clicks work.
-- Turns from before Lens loaded show one plain line per step, without folds or timestamps.
+- Turns from before Lens loaded show one plain line per step, without folds or timestamps; they
+  still open their native detail when Claude Code provides it.
 - Clicking outside Lens's lines selects the row with a gray highlight. That is Claude Code's own
   behavior and a plugin cannot turn it off.
+- Lens can ask Claude Code to redraw native tool details, but Claude Code does not promise
+  Ctrl+O-equivalent output for every renderer through the plugin API.
 
 Read [How it works](/docs/how-it-works.md) before relying on Lens in an unusual setup; it covers
 what Lens records and every known limit. Read [Development](/docs/development.md) before changing

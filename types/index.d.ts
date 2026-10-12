@@ -21,12 +21,6 @@ export type LensStep = {
   /** A sub-agent step: the agent it started, and the model that agent ran. */
   agentId?: string
   agentModel?: string
-  /** An edit's unified-diff hunks, drawn when the step is clicked. */
-  diff?: string
-  /** A command's output (or a failed step's error text), cut short. */
-  output?: string
-  /** A shell step's command, shown above its output when opened. */
-  command?: string
 }
 
 export type LensCursor = {

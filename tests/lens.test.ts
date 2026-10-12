@@ -4,11 +4,9 @@ import type { LensStep } from '../types'
 import {
   cleanFoldLine,
   countsSummary,
-  diffOf,
   modelName,
   foldOf,
   normalRunLine,
-  outputOf,
   questionLine,
   questionPairs,
   rawErrorLine,
@@ -150,6 +148,12 @@ describe('model names', () => {
     expect(modelName('us.anthropic.claude-haiku-5-5-v1:0')).toBe('Haiku 5.5')
     expect(modelName('claude-3-5-sonnet-20241022')).toBe('Sonnet 3.5')
     expect(modelName('claude-opus-4')).toBe('Opus 4')
+    expect(modelName('gpt-6-astra')).toBe('GPT 6 Astra')
+    expect(modelName('openai/gpt-oss-120b')).toBe('openai/GPT OSS 120B')
+    expect(modelName('gemini-2-5-pro')).toBe('Gemini 2 5 Pro')
+    expect(modelName('openrouter/some-new-model')).toBe('openrouter/some-new-model')
+    expect(modelName('vendor/claude-custom')).toBe('vendor/claude-custom')
+    expect(modelName('claude-custom')).toBe('claude-custom')
     expect(modelName(undefined)).toBe('Claude')
   })
 })
@@ -157,6 +161,7 @@ describe('model names', () => {
 describe('step facts (normal view)', () => {
   test('one short fact from each result, never guessed', () => {
     expect(stepDetail('Bash', {}, { stdout: '' }, undefined)).toBe('exit 0')
+    expect(stepDetail('Bash', {}, undefined, undefined)).toBeUndefined()
     expect(stepDetail('Bash', {}, undefined, 'Exit code 2\nboom')).toBe('exit 2')
     expect(stepDetail('Bash', {}, undefined, 'killed')).toBeUndefined()
     expect(stepDetail('Read', {}, { type: 'text', file: { numLines: 34 } }, undefined)).toBe(
@@ -185,60 +190,6 @@ describe('step facts (normal view)', () => {
     ).toBe('String to replace not found in file.')
     expect(rawErrorLine('x'.repeat(300))).toHaveLength(160)
     expect(rawErrorLine(undefined)).toBeUndefined()
-  })
-})
-
-describe('edit diffs', () => {
-  test('build unified-diff hunks from an edit or a new file', () => {
-    expect(
-      diffOf('Edit', {
-        structuredPatch: [
-          {
-            oldStart: 2,
-            oldLines: 1,
-            newStart: 2,
-            newLines: 2,
-            lines: ['-beta', '+beta one', '+beta two'],
-          },
-        ],
-      }),
-    ).toBe('@@ -2,1 +2,2 @@\n-beta\n+beta one\n+beta two')
-    expect(diffOf('Write', { type: 'create', content: 'a\nb\n' })).toBe('@@ -0,0 +1,2 @@\n+a\n+b')
-    expect(diffOf('Bash', { stdout: 'x' })).toBeUndefined()
-    expect(diffOf('Edit', {})).toBeUndefined()
-  })
-
-  test('keep whole hunks up to the cap', () => {
-    const hunk = (n: number) => ({
-      oldStart: n,
-      oldLines: 1,
-      newStart: n,
-      newLines: 1,
-      lines: Array(150).fill('+x'),
-    })
-    const diff = diffOf('Edit', { structuredPatch: [hunk(1), hunk(500)] }) ?? ''
-    expect(diff.split('\n')).toHaveLength(151)
-    expect(diff.match(/^@@/gm)).toHaveLength(1)
-  })
-})
-
-describe('step output', () => {
-  test("keep what a command printed, or a failure's text, cut short", () => {
-    expect(outputOf('Bash', { stdout: 'a\nb\n', stderr: '' }, undefined)).toBe('a\nb')
-    expect(outputOf('Bash', { stdout: 'out', stderr: 'warn' }, undefined)).toBe('out\nwarn')
-    expect(outputOf('Bash', { stdout: '', stderr: '' }, undefined)).toBeUndefined()
-    expect(
-      outputOf('Edit', undefined, '<tool_use_error>String to replace not found</tool_use_error>'),
-    ).toBe('String to replace not found')
-    expect(outputOf('Read', { type: 'text' }, undefined)).toBeUndefined()
-    const long =
-      outputOf(
-        'Bash',
-        { stdout: Array.from({ length: 2100 }, (_, n) => `l${n}`).join('\n') },
-        undefined,
-      ) ?? ''
-    expect(long.split('\n')).toHaveLength(2001)
-    expect(long.endsWith('… cut short; Ctrl+O shows all of it')).toBe(true)
   })
 })
 

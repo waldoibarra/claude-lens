@@ -44,7 +44,7 @@ again afterwards.
 | Path | Contents |
 | --- | --- |
 | `hooks/register.tsx` | The hooks module: recording steps, drawing each view, the `/lens` command |
-| `hooks/lens.ts` | Pure functions: labels, error lines, counts, facts, diffs, output, timestamps |
+| `hooks/lens.ts` | Pure functions: labels, error lines, counts, facts and timestamps |
 | `types/index.d.ts` | The state contract: every value Lens keeps in Claude Code's session state |
 | `tests/lens.test.ts` | Tests for the pure functions |
 | `tests/render.test.tsx` | Tests that drive the hooks through Claude Code's engine and read the drawing |
@@ -63,7 +63,9 @@ Search it for the event or component at hand, such as `'tool.call'` or `ToolGrou
 `claude plugin test` runs each `*.test.ts` and `*.test.tsx` file in an environment like the
 plugin's own, with Claude Code's engine as `$`. The tests answer the engine's side themselves:
 they run tool calls through the plugin, mount a component on the terminal or desktop surface, press
-its buttons, and read the drawn tree. They never start a Claude session or call a model.
+its buttons, and read the drawn tree. They never start a Claude session or call a model. Passing
+these tests proves hook composition, not complete physical TUI rendering of every native detail;
+verify actual Claude rendering before claiming that.
 
 ## Release
 

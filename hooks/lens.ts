@@ -29,6 +29,38 @@ const scrub = (text: string): string =>
 
 const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 
+const MODEL_FAMILIES: Record<string, string> = {
+  gpt: 'GPT',
+  gemini: 'Gemini',
+  grok: 'Grok',
+  deepseek: 'DeepSeek',
+  llama: 'Llama',
+  mistral: 'Mistral',
+  mixtral: 'Mixtral',
+  qwen: 'Qwen',
+  glm: 'GLM',
+  kimi: 'Kimi',
+}
+
+const readableModelId = (id: string): string => {
+  const slash = id.lastIndexOf('/')
+  const namespace = id.slice(0, slash + 1)
+  const name = id.slice(slash + 1)
+  const family = /^(gpt|gemini|grok|deepseek|llama|mistral|mixtral|qwen|glm|kimi)(?=-|\d)/i.exec(
+    name,
+  )
+  if (!family && !/^o\d+(?:-|$)/.test(name)) return id
+  const words = name.split('-').map((word, index) => {
+    if (index === 0) {
+      if (!family) return word
+      return MODEL_FAMILIES[family[1]!.toLowerCase()] + word.slice(family[1]!.length)
+    }
+    if (/^(?:oss|vl|\d+b|[rv]\d+(?:\.\d+)?)$/i.test(word)) return word.toUpperCase()
+    return capitalize(word)
+  })
+  return namespace + words.join(' ')
+}
+
 const humanize = (name: string): string =>
   name
     .replace(/[_-]+/g, ' ')
@@ -258,10 +290,12 @@ export const cleanFoldLine = (fold: Fold, isOpen: boolean): string => {
   return `${isOpen ? '▾' : '▸'} ${parts.join(' · ')}`
 }
 
-/** Normal view's run line: counts per kind, plus failures. */
-export const normalRunLine = (fold: Fold): string => {
+/** Normal view's run line: counts per kind, failures, and a hidden current step. */
+export const normalRunLine = (fold: Fold, currentHidden?: string): string => {
   const summary = capitalize(countsSummary(fold.steps)) || 'No steps'
-  return fold.failed > 0 ? `• ${summary} (${fold.failed} failed)` : `• ${summary}`
+  const failed = fold.failed > 0 ? ` (${fold.failed} failed)` : ''
+  const current = currentHidden ? ` · Current: ${currentHidden}` : ''
+  return `• ${summary}${failed}${current}`
 }
 
 const lineCount = (text: string): number =>
@@ -299,7 +333,7 @@ export const stepDetail = (
   const inp = (input && typeof input === 'object' ? input : {}) as Input
   switch (tool) {
     case 'Bash': {
-      if (failure === undefined) return 'exit 0'
+      if (failure === undefined) return result === undefined ? undefined : 'exit 0'
       const code = /exit code (\d+)/i.exec(failure)?.[1]
       return code ? `exit ${code}` : undefined
     }
@@ -418,76 +452,22 @@ export const parseOffset = (text: string): number | null => {
 
 /**
  * A display name for a model id: `claude-opus-5-5` → `Opus 5.5`,
- * `claude-3-5-sonnet-20241022` → `Sonnet 3.5`; unknown ids → `Claude`.
+ * `gpt-6-astra` → `GPT 6 Astra`; unknown ids stay unchanged.
  */
 export const modelName = (id: string | undefined): string => {
-  const raw = (id ?? '')
+  if (id === undefined) return 'Claude'
+  const original = id.trim()
+  if (original === '') return 'Claude'
+  const raw = original
     .toLowerCase()
     .replace(/\[.*\]$/, '')
     .replace(/^.*?(claude-)/, '$1')
+  if (!raw.startsWith('claude-')) return readableModelId(original)
   const modern = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:-v\d.*)?$/.exec(raw)
   if (modern) return `${capitalize(modern[1]!)} ${modern[2]}${modern[3] ? `.${modern[3]}` : ''}`
   const legacy = /^claude-(\d+)(?:-(\d+))?-([a-z]+)/.exec(raw)
   if (legacy) return `${capitalize(legacy[3]!)} ${legacy[1]}${legacy[2] ? `.${legacy[2]}` : ''}`
-  return 'Claude'
-}
-
-/** Most diff lines a step keeps; whole hunks only, so the diff still parses. */
-export const MAX_DIFF_LINES = 200
-
-/** An edit's unified-diff hunks from its result, or undefined when none. */
-export const diffOf = (tool: string, result: unknown): string | undefined => {
-  if (tool !== 'Edit' && tool !== 'Write' && tool !== 'NotebookEdit') return undefined
-  const r = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>
-  const hunks: string[][] = []
-  if (r.type === 'create' && typeof r.content === 'string') {
-    const lines = r.content.replace(/\n$/, '').split('\n')
-    hunks.push([`@@ -0,0 +1,${lines.length} @@`, ...lines.map(l => `+${l}`)])
-  } else if (Array.isArray(r.structuredPatch)) {
-    for (const h of r.structuredPatch as Array<Record<string, unknown>>) {
-      const lines = Array.isArray(h.lines) ? (h.lines as string[]) : []
-      hunks.push([`@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@`, ...lines])
-    }
-  }
-  const kept: string[] = []
-  for (const hunk of hunks) {
-    if (kept.length > 0 && kept.length + hunk.length > MAX_DIFF_LINES) break
-    kept.push(...hunk.slice(0, MAX_DIFF_LINES))
-  }
-  return kept.length > 1 ? kept.join('\n') : undefined
-}
-
-/** Most output a step keeps, in lines and characters. */
-export const MAX_OUTPUT_LINES = 2000
-export const MAX_OUTPUT_CHARS = 20_000
-
-/** How many recent steps keep their output and diff; older ones drop them. */
-export const KEEP_DETAIL_STEPS = 150
-
-/**
- * What a step printed, for a click to show: a command's stdout and stderr,
- * or a failed step's error text; undefined when there is nothing to show.
- */
-export const outputOf = (
-  tool: string,
-  result: unknown,
-  failure: string | undefined,
-): string | undefined => {
-  const r = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>
-  let text = ''
-  if (failure !== undefined) text = failure.replace(/<\/?[a-z_]+>/gi, '')
-  else if (tool === 'Bash') {
-    const out = typeof r.stdout === 'string' ? r.stdout : ''
-    const err = typeof r.stderr === 'string' ? r.stderr : ''
-    text = [out, err].filter(t => t.trim() !== '').join('\n')
-  }
-  text = text.replace(/\s+$/, '')
-  if (text.trim() === '') return undefined
-  const lines = text.split('\n')
-  let kept = lines.slice(0, MAX_OUTPUT_LINES).join('\n')
-  if (kept.length > MAX_OUTPUT_CHARS) kept = kept.slice(0, MAX_OUTPUT_CHARS)
-  const cut = kept.length < text.length
-  return cut ? `${kept}\n… cut short; Ctrl+O shows all of it` : kept
+  return original
 }
 
 export const VIEWS = ['clean', 'normal', 'raw'] as const

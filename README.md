@@ -93,8 +93,8 @@ Lens needs Claude Code 2.1.287 or later, the release that added Claude Mods; it 
   output, diff or age cap.
 - **Message labels:** your prompts and Claude's replies get a right-aligned label with the time and,
   for replies, the model that wrote them, so a `/model` switch is visible where it happened.
-- **Answered questions:** a question Claude asked folds to one line; click it to see the question
-  and your answer.
+- **Questions:** question transcript rows get a disclosure; answered rows show the answer when
+  opened, while waiting, skipped and failed rows keep Claude Code's native detail.
 - **A working line:** while a step runs, the spinner names it.
 - **Sub-agents:** a delegated step shows the model the agent ran on.
 
@@ -118,7 +118,8 @@ Read [Views](/docs/views.md) before picking a view; it shows each one and lists 
 - Clicking outside Lens's lines selects the row with a gray highlight. That is Claude Code's own
   behavior and a plugin cannot turn it off.
 - Lens can ask Claude Code to redraw native tool details, but Claude Code does not promise
-  Ctrl+O-equivalent output for every renderer through the plugin API.
+  Ctrl+O-equivalent output for every renderer through the plugin API. The live question dialog stays
+  native; Lens only folds its transcript rows.
 
 Read [How it works](/docs/how-it-works.md) before relying on Lens in an unusual setup; it covers
 what Lens records and every known limit. Read [Development](/docs/development.md) before changing

@@ -956,7 +956,7 @@ describe('lens rendering', () => {
     expect(await back.find({ key: 'toggle' })).toBeDefined()
   })
 
-  test('messages carry a label; answered questions fold to one line', async ($, on) => {
+  test('messages carry a label', async ($, on) => {
     const bottom = { lastText: '' }
     on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
       bottom.lastText = e.props.text
@@ -1053,72 +1053,159 @@ describe('lens rendering', () => {
       requestId: 'u-1',
       props: { text: 'fix it', origin: { kind: 'composer' }, isExpanded: false },
     })
+  })
 
-    const question = await $.ui.mount({
+  test('question transcript rows use chevrons and delegate native details', async ($, on) => {
+    engineBottom(on)
+    const answeredOutput = {
+      questions: [{ header: 'Scope', question: 'Which scope?' }],
+      answers: { 'Which scope?': 'User' },
+    }
+    for (const view of ['normal', 'clean'] as const) {
+      await $.command.run({ command: 'lens', args: view } as never)
+      const question = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolUse',
+        requestId: `q-${view}`,
+        props: { ...toolRow(`q-${view}`, 'AskUserQuestion', {}), output: answeredOutput },
+      })
+      expect((await question.find({ key: 'question-toggle' }))?.text).toBe(
+        '▸ ? Answered Scope: User',
+      )
+      const closedQuestionResult = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolResult',
+        requestId: `q-${view}`,
+        props: {
+          tool_use_id: `q-${view}`,
+          tool: 'AskUserQuestion',
+          output: { response: 'User' },
+          isErrored: false,
+        },
+      })
+      expect(await closedQuestionResult.find({ key: 'folded' })).toBeDefined()
+      await closedQuestionResult.unmount()
+
+      await question.press({ key: 'question-toggle' })
+      expect((await question.find({ key: 'question-toggle' }))?.text).toBe(
+        '▾ ? Answered Scope: User',
+      )
+      expect((await question.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
+        'Scope: Which scope?',
+        '→ User',
+        'ENGINE',
+      ])
+      const openQuestionResult = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolResult',
+        requestId: `q-${view}`,
+        props: {
+          tool_use_id: `q-${view}`,
+          tool: 'AskUserQuestion',
+          output: { response: 'User' },
+          isErrored: false,
+        },
+      })
+      expect(await openQuestionResult.find({ text: 'ENGINE' })).toBeDefined()
+      await openQuestionResult.unmount()
+      await question.unmount()
+    }
+  })
+
+  test('waiting skipped and error questions keep native contents when opened', async ($, on) => {
+    engineBottom(on)
+    for (const props of [
+      {
+        ...toolRow('q-waiting', 'AskUserQuestion', {
+          questions: [{ header: 'Scope', question: 'Which scope?' }],
+        }),
+        isRunning: true,
+        output: undefined,
+        expected: '▸ ? Waiting for your answer…',
+      },
+      {
+        ...toolRow('q-skipped', 'AskUserQuestion', {
+          questions: [{ header: 'Scope', question: 'Which scope?' }],
+        }),
+        output: undefined,
+        expected: '▸ ? Question skipped. The step failed. Press Ctrl+O to see the details.',
+      },
+      {
+        ...toolRow('q-error', 'AskUserQuestion', {
+          questions: [{ header: 'Scope', question: 'Which scope?' }],
+        }),
+        isErrored: true,
+        output: 'permission denied',
+        expected:
+          '▸ ? Question skipped. Permission denied. Check file permissions or run with access.',
+      },
+    ]) {
+      const question = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolUse',
+        requestId: props.tool_use_id,
+        props,
+      })
+      expect((await question.find({ key: 'question-toggle' }))?.text).toBe(props.expected)
+      expect(await question.find({ text: /→|Scope: Which scope/ })).toBeUndefined()
+      await question.press({ key: 'question-toggle' })
+      expect((await question.find({ key: 'question-toggle' }))?.text).toBe(
+        props.expected.replace('▸', '▾'),
+      )
+      expect(await question.find({ text: 'ENGINE' })).toBeDefined()
+      expect(await question.find({ text: /→|Scope: Which scope/ })).toBeUndefined()
+      const result = await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'ToolResult',
+        requestId: props.tool_use_id,
+        props: {
+          tool_use_id: props.tool_use_id,
+          tool: 'AskUserQuestion',
+          output: props.output,
+          isErrored: props.isErrored,
+        },
+      })
+      expect(await result.find({ text: 'ENGINE' })).toBeDefined()
+      await result.unmount()
+      await question.unmount()
+    }
+  })
+
+  test('the native AskUserQuestion dialog and raw view pass through untouched', async ($, on) => {
+    engineBottom(on)
+    let dialogError = ''
+    try {
+      await $.ui.mount({
+        plugin: 'lens',
+        surface: 'terminal',
+        component: 'AskUserQuestion',
+        props: {
+          tool: 'AskUserQuestion',
+          questions: [{ header: 'Scope', question: 'Which scope?' }],
+        },
+      })
+    } catch (error) {
+      dialogError = String(error)
+    }
+    expect(dialogError).toContain('the engine drew its own')
+
+    await $.command.run({ command: 'lens', args: 'raw' } as never)
+    const rawQuestion = await $.ui.mount({
       plugin: 'lens',
       surface: 'terminal',
       component: 'ToolUse',
-      requestId: 'q-1',
+      requestId: 'q-raw',
       props: {
-        ...toolRow('q-1', 'AskUserQuestion', {}),
-        output: {
-          questions: [{ header: 'Scope', question: 'Which scope?' }],
-          answers: { 'Which scope?': 'User' },
-        },
-      },
-    })
-    expect((await question.find({ key: 'question-toggle' }))?.text).toBe('? Answered Scope: User')
-    const closedQuestionResult = await $.ui.mount({
-      plugin: 'lens',
-      surface: 'terminal',
-      component: 'ToolResult',
-      requestId: 'q-1',
-      props: {
-        tool_use_id: 'q-1',
-        tool: 'AskUserQuestion',
+        ...toolRow('q-raw', 'AskUserQuestion', {}),
         output: { response: 'User' },
-        isErrored: false,
       },
     })
-    expect(await closedQuestionResult.find({ key: 'folded' })).toBeDefined()
-    await closedQuestionResult.unmount()
-    // A click shows the question and the answer in full.
-    await question.press({ key: 'question-toggle' })
-    expect((await question.findAll({ type: 'Text' })).map(t => t.text)).toEqual([
-      'Scope: Which scope?',
-      '→ User',
-      'ENGINE',
-    ])
-    const openQuestionResult = await $.ui.mount({
-      plugin: 'lens',
-      surface: 'terminal',
-      component: 'ToolResult',
-      requestId: 'q-1',
-      props: {
-        tool_use_id: 'q-1',
-        tool: 'AskUserQuestion',
-        output: { response: 'User' },
-        isErrored: false,
-      },
-    })
-    expect(await openQuestionResult.find({ text: 'ENGINE' })).toBeDefined()
-    await openQuestionResult.unmount()
-    await question.press({ key: 'question-toggle' })
-    expect(await question.findAll({ type: 'Text' })).toHaveLength(0)
-    const reclosedQuestionResult = await $.ui.mount({
-      plugin: 'lens',
-      surface: 'terminal',
-      component: 'ToolResult',
-      requestId: 'q-1',
-      props: {
-        tool_use_id: 'q-1',
-        tool: 'AskUserQuestion',
-        output: { response: 'User' },
-        isErrored: false,
-      },
-    })
-    expect(await reclosedQuestionResult.find({ key: 'folded' })).toBeDefined()
-    await reclosedQuestionResult.unmount()
+    expect(await rawQuestion.drawn()).toMatchObject({ type: 'Text', children: ['ENGINE'] })
   })
 
   test('the spinner shows the current step; command errors are relabeled', async ($, on) => {

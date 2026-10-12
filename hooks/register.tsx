@@ -463,18 +463,19 @@ export const register: Register = on => {
     const p = e.props
 
     if (p.tool === 'AskUserQuestion') {
-      if (p.isRunning) return <Text dimColor>? Waiting for your answer…</Text>
       const key = questionOpenKey(p.tool_use_id)
       const open = (await read($, expanded)).includes(key)
-      const pairs = questionPairs(p.input, p.output)
-      const line = questionLine(p.output, p.isErrored)
+      const answered =
+        !p.isRunning && !p.isErrored && typeof p.output === 'object' && p.output !== null
+      const pairs = answered ? questionPairs(p.input, p.output) : []
+      const line = p.isRunning ? '? Waiting for your answer…' : questionLine(p.output, p.isErrored)
       return (
         <Box key="question" flexDirection="column" width="100%">
           <Button
             key="question-toggle"
             plain
             dimColor
-            label={line}
+            label={`${open ? '▾' : '▸'} ${line}`}
             onPress={() => toggle($, key)}
           />
           {open &&

@@ -77,8 +77,9 @@ exactly as Claude Code shows it without Lens.
   [Error lines](#error-lines).
 - **Click to open a step:** a `▸` step asks Claude Code to draw that step's native detail row in
   place and changes to `▾`. Click again to close.
-- **Answered questions:** a question Claude asked you folds to one line, such as `? Answered Scope:
-  User`. Click it to see each question and your answer.
+- **Questions:** a question transcript row always has a disclosure, such as `▸ ? Waiting for your
+  answer…` or `▸ ? Answered Scope: User`. Answered rows show the question and answer when opened;
+  waiting, skipped and failed rows delegate to Claude Code's native detail only.
 - **Working line:** while a step runs, the spinner shows its label instead of a random verb.
 - **Background agents:** the "Agent … finished" row ends with the agent's model and finish time.
 
@@ -109,11 +110,13 @@ A failed slash command's output is relabeled the same way.
 
 - **Ctrl+O** opens Claude Code's full transcript, which Lens leaves untouched.
 - **`/lens raw`** shows the whole transcript without Lens.
-- Clicking a step delegates to Claude Code's native detail renderer for that original row. Lens does
-  not copy command output, diffs or read results, and adds no line, character or age cap.
+- Clicking a step or question transcript row delegates to Claude Code's native detail renderer for
+  that original row. Lens does not copy command output, diffs or read results, and adds no line,
+  character or age cap.
 - Native details can still be limited by Claude Code itself. In the generated 2.1.294 plugin API,
   hooks can request native `ToolUse`, `ToolResult` and expanded `ToolGroup` rendering, but there is
-  no prop that promises a Ctrl+O-equivalent expanded body for every tool.
+  no prop that promises a Ctrl+O-equivalent expanded body for every tool. Lens does not hook the
+  live `AskUserQuestion` dialog; only its transcript rows are folded.
 - Pi Lens shares this visual target where Pi's host allows it. Its source-only, unreleased public
   repository is <https://github.com/waldoibarra/pi-lens>; host-specific thinking and viewport
   behavior can still differ.

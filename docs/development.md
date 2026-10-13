@@ -94,7 +94,7 @@ archive plus Claude Code plugin validation.
 8. Promote `latest` only after the versioned release is published and verified:
 
    ```sh
-   git tag latest 'v0.1.1^{commit}'
+   git tag latest 'v0.1.2^{commit}'
    git push origin refs/tags/latest
    ```
 
@@ -102,7 +102,7 @@ archive plus Claude Code plugin validation.
    Replace `OLD_OBJECT_ID` with that result and use the newly published version:
 
    ```sh
-   git tag -f latest 'v0.1.1^{commit}'
+   git tag -f latest 'v0.1.2^{commit}'
    git push --force-with-lease=refs/tags/latest:OLD_OBJECT_ID origin refs/tags/latest
    ```
 

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "claude-code-lens",
+      "name": "claude-lens",
       "devDependencies": {
         "prettier": "3.6.2",
         "typescript": "^5.9.3",

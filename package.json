@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-lens",
+  "name": "claude-lens",
   "private": true,
   "description": "Claude Code plugin: a calmer transcript with folded tool runs and plain errors",
   "license": "MIT",

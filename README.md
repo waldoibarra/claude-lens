@@ -67,12 +67,22 @@ Click a step and it opens Claude Code's own detail row in place, without Lens-ad
 ## Install
 
 ```sh
-claude plugin marketplace add waldoibarra/claude-code-lens
-claude plugin install lens@claude-code-lens
+claude plugin marketplace add waldoibarra/claude-lens
+claude plugin install lens@claude-lens
 ```
 
 Start a new Claude Code session, or run `/reload-plugins` in an open one. Lens starts in the normal
 view; type `/lens` to check it loaded.
+
+If you installed Lens before the repository rename, remove the old marketplace entry and reinstall
+from `claude-lens` while keeping plugin data:
+
+```sh
+claude plugin uninstall lens@claude-code-lens --scope user --keep-data
+claude plugin marketplace remove claude-code-lens --scope user
+claude plugin marketplace add waldoibarra/claude-lens
+claude plugin install lens@claude-lens
+```
 
 Lens needs Claude Code 2.1.287 or later, the release that added Claude Mods; it is tested on
 2.1.293. If `/lens` is not a known command after installing, update Claude Code with

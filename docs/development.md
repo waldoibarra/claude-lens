@@ -36,7 +36,7 @@ reloads the plugin; a save made during a turn reloads when the turn ends. Saved 
 current view survives the reload.
 
 If Lens is also installed from the marketplace, disable it for the session
-(`claude plugin disable lens@claude-code-lens`) so two copies do not draw at once, and enable it
+(`claude plugin disable lens@claude-lens`) so two copies do not draw at once, and enable it
 again afterwards.
 
 ## Layout
@@ -72,7 +72,7 @@ verify actual Claude rendering before claiming that.
 Users get a new version when its `version` in `.claude-plugin/plugin.json` changes.
 Public release tags are immutable; cut a new patch version instead of moving one.
 
-Claude Code Lens has no npm publication payload. Treat the release payload as the tagged repository
+Claude Lens has no npm publication payload. Treat the release payload as the tagged repository
 archive plus Claude Code plugin validation.
 
 1. Bump `version` in `.claude-plugin/plugin.json`: patch for fixes and docs, minor for new
@@ -90,6 +90,6 @@ archive plus Claude Code plugin validation.
 7. Publish a GitHub Release for the tag with short notes: what changed and whether upgrading needs
    any action.
 
-Installed copies update with `claude plugin marketplace update claude-code-lens`, then
-`claude plugin update lens@claude-code-lens`, or on their own when the marketplace is added with
+Installed copies update with `claude plugin marketplace update claude-lens`, then
+`claude plugin update lens@claude-lens`, or on their own when the marketplace is added with
 auto-update on.

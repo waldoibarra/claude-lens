@@ -4,7 +4,7 @@ Navigation index for coding agents. Read this first; open linked docs when the t
 
 ## Project
 
-`claude-code-lens` is the Claude Code plugin `lens`, built from function hooks. It redraws the
+`claude-lens` is the Claude Code plugin `lens`, built from function hooks. It redraws the
 transcript in three views (`/lens normal`, `/lens clean`, `/lens raw`) without changing what Claude
 reads. The hooks module is `hooks/register.tsx`, pure logic is `hooks/lens.ts`, the state contract
 is `types/index.d.ts`, and tests are in `tests/`.

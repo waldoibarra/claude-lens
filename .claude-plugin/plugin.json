@@ -5,8 +5,8 @@
   "author": {
     "name": "Waldo Ibarra"
   },
-  "homepage": "https://github.com/waldoibarra/claude-code-lens",
-  "repository": "https://github.com/waldoibarra/claude-code-lens",
+  "homepage": "https://github.com/waldoibarra/claude-lens",
+  "repository": "https://github.com/waldoibarra/claude-lens",
   "license": "MIT",
   "keywords": ["transcript", "tool-calls", "errors", "view"],
   "types": "./types/index.d.ts"

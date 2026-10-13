@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-lens",
+  "name": "claude-lens",
   "description": "Lens, a Claude Code plugin for a calmer transcript.",
   "owner": {
     "name": "Waldo Ibarra"

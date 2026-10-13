@@ -1,6 +1,6 @@
 {
   "name": "lens",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A calmer Claude Code transcript: fold tool runs, read plain errors, switch views with /lens.",
   "author": {
     "name": "Waldo Ibarra"

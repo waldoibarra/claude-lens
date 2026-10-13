@@ -118,7 +118,7 @@ A failed slash command's output is relabeled the same way.
   no prop that promises a Ctrl+O-equivalent expanded body for every tool. Lens does not hook the
   live `AskUserQuestion` dialog; only its transcript rows are folded.
 - Pi Lens shares this visual target where Pi's host allows it. Install it from
-  `git:github.com/waldoibarra/pi-lens@v0.1.0`; host-specific thinking and viewport behavior can
+  `git:github.com/waldoibarra/pi-lens@v0.1.1`; host-specific thinking and viewport behavior can
   still differ.
 
 Read [How it works](/docs/how-it-works.md) before relying on Ctrl+O, timestamps or clicks in an

@@ -70,7 +70,8 @@ verify actual Claude rendering before claiming that.
 ## Release
 
 Users get a new version when its `version` in `.claude-plugin/plugin.json` changes.
-Public release tags are immutable; cut a new patch version instead of moving one.
+Versioned release tags are immutable; cut a new patch version instead of moving one.
+Only `latest`, the convenience alias for the latest published release, may move.
 
 Claude Lens has no npm publication payload. Treat the release payload as the tagged repository
 archive plus Claude Code plugin validation.
@@ -90,6 +91,30 @@ archive plus Claude Code plugin validation.
 7. Publish a GitHub Release for the tag with short notes: what changed and whether upgrading needs
    any action.
 
-Installed copies update with `claude plugin marketplace update claude-lens`, then
-`claude plugin update lens@claude-lens`, or on their own when the marketplace is added with
-auto-update on.
+8. Promote `latest` only after the versioned release is published and verified:
+
+   ```sh
+   git tag latest 'v0.1.1^{commit}'
+   git push origin refs/tags/latest
+   ```
+
+   For later releases, first inspect `git ls-remote origin refs/tags/latest`.
+   Replace `OLD_OBJECT_ID` with that result and use the newly published version:
+
+   ```sh
+   git tag -f latest 'v0.1.1^{commit}'
+   git push --force-with-lease=refs/tags/latest:OLD_OBJECT_ID origin refs/tags/latest
+   ```
+
+   Never force a version tag or branch. Inspect a failed lease before retrying.
+
+9. Update managed installations' explicit marketplace `source.ref` pins.
+   Verify the installed plugin version. Keep the previous pin for rollback.
+   No release branch is required.
+
+Installed copies reconcile their configured source with
+`claude plugin marketplace update claude-lens`, then `claude plugin update lens@claude-lens`,
+or through marketplace auto-update.
+A version-pinned marketplace does not follow `latest` or the default branch.
+Changing the shared pin is a separate deployment step.
+Publishing a release does not change installed settings.

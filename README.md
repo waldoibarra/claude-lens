@@ -67,7 +67,7 @@ Click a step and it opens Claude Code's own detail row in place, without Lens-ad
 ## Install
 
 ```sh
-claude plugin marketplace add waldoibarra/claude-lens
+claude plugin marketplace add waldoibarra/claude-lens@v0.1.1
 claude plugin install lens@claude-lens
 ```
 
@@ -80,7 +80,7 @@ from `claude-lens` while keeping plugin data:
 ```sh
 claude plugin uninstall lens@claude-code-lens --scope user --keep-data
 claude plugin marketplace remove claude-code-lens --scope user
-claude plugin marketplace add waldoibarra/claude-lens
+claude plugin marketplace add waldoibarra/claude-lens@v0.1.1
 claude plugin install lens@claude-lens
 ```
 
@@ -109,7 +109,7 @@ Lens needs Claude Code 2.1.287 or later, the release that added Claude Mods; it 
 - **Sub-agents:** a delegated step shows the model the agent ran on.
 
 Use Pi instead of Claude Code? Install the sibling [Pi Lens](https://github.com/waldoibarra/pi-lens)
-from `git:github.com/waldoibarra/pi-lens@v0.1.0`.
+from `git:github.com/waldoibarra/pi-lens@v0.1.1`.
 
 Read [Views](/docs/views.md) before picking a view; it shows each one and lists every error line.
 

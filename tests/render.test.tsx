@@ -104,10 +104,10 @@ describe('lens rendering', () => {
       // Run 1: the two reads.
       const runOne = await mount(steps[0]!, 'Read')
       expect((await runOne.find({ key: 'toggle' }))?.text).toBe('▸ 2 steps')
-      // Run 1 came before any reply row: the gray label names no model.
-      expect((await runOne.findAll({ type: 'Text' })).map(t => [t.text, t.props.dimColor])).toEqual(
-        [[expect.stringMatching(/^Claude · \d\d:\d\d$/), undefined]],
-      )
+      // Run 1 came before any reply row: the cyan label names no model.
+      expect((await runOne.findAll({ type: 'Text' })).map(t => [t.text, t.props.color])).toEqual([
+        [expect.stringMatching(/^Claude · \d\d:\d\d$/), 'cyan'],
+      ])
       await runOne.press({ key: 'toggle' })
       expect((await runOne.find({ key: 'toggle' }))?.text).toBe('▾ 2 steps')
       expect((await runOne.find({ key: `step-${steps[0]!}` }))?.text).toBe('▸ ✓ Read a.ts')
@@ -265,7 +265,7 @@ describe('lens rendering', () => {
       '▸ ✓ Delegated: Count lines · Haiku 5.5',
     )
 
-    // Its "finished" row carries the model and finish time, gray.
+    // Its "finished" row carries the model and finish time, cyan.
     const notice = await $.ui.mount({
       plugin: 'lens',
       surface: 'terminal',
@@ -281,7 +281,7 @@ describe('lens rendering', () => {
     const label = await notice.find({ key: 'label' })
     expect(label?.text).toMatch(/^Haiku 5\.5 · \d\d:\d\d$/)
     expect((label?.children[0] as { props: Record<string, unknown> }).props).toEqual({
-      color: 'inactive',
+      color: 'cyan',
     })
   })
 
@@ -528,7 +528,7 @@ describe('lens rendering', () => {
     expect((await ui.find({ key: 'label' }))?.text).toMatch(/^Claude · /)
   })
 
-  test('text blocks get a coloured label; runs a gray one under their steps', async ($, on) => {
+  test('model and time tags use cyan in normal and clean views', async ($, on) => {
     const seen: Array<{ text: string; isFirstOfReply: boolean }> = []
     let group: { isExpanded: boolean; ids: string[] } | undefined
     on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
@@ -546,7 +546,7 @@ describe('lens rendering', () => {
     })
     const steps = await playTurn($, engineBottom(on))
 
-    // The block keeps its own label, coloured, and loses the bullet.
+    // The block keeps its own cyan label and loses the bullet.
     const block = await $.ui.mount({
       plugin: 'lens',
       surface: 'terminal',
@@ -556,10 +556,10 @@ describe('lens rendering', () => {
     })
     const blockLabel = (await block.findAll({ type: 'Text' }))[1]
     expect(blockLabel?.text).toMatch(/^Opus 5\.5 · \d\d:\d\d$/)
-    expect(blockLabel?.props).toMatchObject({ bold: true, color: 'claude' })
+    expect(blockLabel?.props).toMatchObject({ bold: true, color: 'cyan' })
     expect(seen.at(-1)).toEqual({ text: 'Running the tests now.', isFirstOfReply: false })
 
-    // The run after it: gray label, last, right-aligned, its model.
+    // The run after it: cyan label, last, right-aligned, its model.
     const runTwo = await $.ui.mount({
       plugin: 'lens',
       surface: 'terminal',
@@ -581,7 +581,7 @@ describe('lens rendering', () => {
     })
     const runLabel = await runTwo.find({ key: 'label' })
     expect((runLabel?.children[0] as { props: Record<string, unknown> }).props).toEqual({
-      color: 'inactive',
+      color: 'cyan',
     })
     await runTwo.press({ key: `step-${steps[3]!}` })
     expect(await runTwo.find({ key: 'label' })).toBeUndefined()
@@ -603,7 +603,11 @@ describe('lens rendering', () => {
       props: { key: 'result-with-label' },
       children: [
         { type: 'Text', children: ['ENGINE'] },
-        { type: 'Box', props: { key: 'label', justifyContent: 'flex-end' } },
+        {
+          type: 'Box',
+          props: { key: 'label', justifyContent: 'flex-end' },
+          children: [{ type: 'Text', props: { color: 'cyan' } }],
+        },
       ],
     })
     await resultWithFooter.unmount()
@@ -635,6 +639,20 @@ describe('lens rendering', () => {
       await g.unmount()
     }
     expect(group).toEqual({ isExpanded: true, ids: [steps[2]!, steps[3]!, 'unseen'] })
+
+    const cleanRun = await $.ui.mount({
+      plugin: 'lens',
+      surface: 'terminal',
+      component: 'ToolUse',
+      requestId: steps[2]!,
+      props: toolRow(steps[2]!, 'Bash', {}),
+    })
+    const cleanLabel = await cleanRun.find({ key: 'label' })
+    expect(cleanLabel?.text).toMatch(/^Opus 5\.5 · \d\d:\d\d$/)
+    expect((cleanLabel?.children[0] as { props: Record<string, unknown> }).props).toEqual({
+      color: 'cyan',
+    })
+    await cleanRun.unmount()
   })
 
   test('open grouped rows keep the run footer with inline native results', async ($, on) => {
@@ -672,7 +690,11 @@ describe('lens rendering', () => {
     })
     await lastGrouped.press({ key: `step-${steps[3]!}` })
     expect(await lastGrouped.find({ text: 'ENGINE' })).toBeDefined()
-    expect((await lastGrouped.find({ key: 'label' }))?.text).toMatch(/^Opus 5\.5 · \d\d:\d\d$/)
+    const groupedLabel = await lastGrouped.find({ key: 'label' })
+    expect(groupedLabel?.text).toMatch(/^Opus 5\.5 · \d\d:\d\d$/)
+    expect((groupedLabel?.children[0] as { props: Record<string, unknown> }).props).toEqual({
+      color: 'cyan',
+    })
   })
 
   test('native delegation preserves large and old details', async ($, on) => {

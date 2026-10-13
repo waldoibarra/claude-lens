@@ -25,7 +25,7 @@ I'll check the config, then run the tests.
   ▸ ✗ Run the tests · exit 1
     The command failed (exit 1). Press Ctrl+O to see its output.
     npm ERR! Missing script: "tset"
-                                                    Opus 5.5 · 10:22 (gray)
+                                                    Opus 5.5 · 10:22 (cyan)
 ```
 
 - The count line totals each kind of step: files read, files changed, commands, searches, web
@@ -50,7 +50,7 @@ I'll check the config, then run the tests.
                                                            Opus 5.5 · 10:22
 ▸ 3 steps · 1 failed
   ✗ The command failed (exit 1). Press Ctrl+O to see its output.
-                                                    Opus 5.5 · 10:22 (gray)
+                                                    Opus 5.5 · 10:22 (cyan)
 ```
 
 - Each run is one line: the number of steps and the number that failed.
@@ -65,7 +65,7 @@ exactly as Claude Code shows it without Lens.
 ## What every view except raw adds
 
 - **Message labels:** a right-aligned line under each message: `You · 10:20` under your prompts,
-  the replying model under each block of Claude's reply (`Opus 5.5 · 10:22`), and a gray label
+  the replying model under each block of Claude's reply (`Opus 5.5 · 10:22`), and a cyan label
   under each run with the model that called its steps and the time the run started. The model is
   read per reply, so a `/model` switch shows on the next reply. Known non-Claude model ids are
   humanized, unknown identifiers stay unchanged, and missing model metadata shows `Claude`.

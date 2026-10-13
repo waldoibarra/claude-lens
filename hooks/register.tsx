@@ -241,7 +241,7 @@ async function drawToolUseStep(
       )}
       {runLabel && (
         <Box key="label" justifyContent="flex-end">
-          <Text color="inactive">{runLabel}</Text>
+          <Text color="cyan">{runLabel}</Text>
         </Box>
       )}
     </Box>
@@ -315,7 +315,7 @@ function agentOf(result: unknown, text: string | undefined) {
 }
 
 // A background task's "finished" row: the sub-agent's model and finish time,
-// gray and right-aligned like a run's label.
+// cyan and right-aligned like a run's label.
 async function drawNotice(
   $: Dollar,
   e: RenderInput<'UserMessage'>,
@@ -338,7 +338,7 @@ async function drawNotice(
     <Box flexDirection="column">
       {inner}
       <Box key="label" justifyContent="flex-end">
-        <Text color="inactive">{text}</Text>
+        <Text color="cyan">{text}</Text>
       </Box>
     </Box>
   )
@@ -554,7 +554,7 @@ export const register: Register = on => {
       <Box key="result-with-label" flexDirection="column" width="100%">
         {result}
         <Box key="label" justifyContent="flex-end">
-          <Text color="inactive">{runLabel}</Text>
+          <Text color="cyan">{runLabel}</Text>
         </Box>
       </Box>
     ) : (
@@ -588,7 +588,7 @@ export const register: Register = on => {
   })
 
   // The label marks each message, so the engine's bullet is dropped. Text
-  // blocks carry a coloured label; runs of steps a gray one.
+  // blocks and step runs carry cyan model/time labels.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     const v = await read($, view)
     if (v === 'raw' || transcriptOpen()) return next(e)
@@ -601,7 +601,7 @@ export const register: Register = on => {
       <Box flexDirection="column">
         {inner}
         <Box key="label" justifyContent="flex-end">
-          <Text bold color="claude">
+          <Text bold color="cyan">
             {await stampLabel($, null, hit)}
           </Text>
         </Box>

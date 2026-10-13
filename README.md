@@ -45,7 +45,7 @@ I'll check the config, then run the tests.
   ▸ ✗ Run the tests · exit 1
     The command failed (exit 1). Press Ctrl+O to see its output.
     npm ERR! Missing script: "tset"
-                                                    Opus 5.5 · 10:22 (gray)
+                                                    Opus 5.5 · 10:22 (cyan)
 ```
 
 **Clean** (`/lens clean`), the lean option: a step count per run and only what went wrong. Use
@@ -59,7 +59,7 @@ I'll check the config, then run the tests.
                                                            Opus 5.5 · 10:22
 ▸ 3 steps · 1 failed
   ✗ The command failed (exit 1). Press Ctrl+O to see its output.
-                                                    Opus 5.5 · 10:22 (gray)
+                                                    Opus 5.5 · 10:22 (cyan)
 ```
 
 Click a step and it opens Claude Code's own detail row in place, without Lens-added truncation.

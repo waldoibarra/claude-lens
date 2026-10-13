@@ -69,16 +69,25 @@ verify actual Claude rendering before claiming that.
 
 ## Release
 
-Users get a new version when its `version` in `.claude-plugin/plugin.json` changes. Never move a
-published tag; cut a new patch version instead.
+Users get a new version when its `version` in `.claude-plugin/plugin.json` changes.
+Public release tags are immutable; cut a new patch version instead of moving one.
+
+Claude Code Lens has no npm publication payload. Treat the release payload as the tagged repository
+archive plus Claude Code plugin validation.
 
 1. Bump `version` in `.claude-plugin/plugin.json`: patch for fixes and docs, minor for new
    behavior, major for breaking changes.
-2. Commit it as `chore: release vX.Y.Z`.
-3. Tag the commit: `git tag -a vX.Y.Z -m "<one-line summary>"`.
-4. Push both: `git push && git push origin vX.Y.Z`.
-5. Confirm CI passes on the tagged commit.
-6. Publish a GitHub Release for the tag with short notes: what changed and whether upgrading needs
+2. Run the pre-publication check:
+
+   ```sh
+   just check
+   ```
+
+3. Commit it as `chore: release vX.Y.Z`.
+4. Tag the commit: `git tag -a vX.Y.Z -m "<one-line summary>"`.
+5. Push both: `git push && git push origin vX.Y.Z`.
+6. Confirm CI passes on the tagged commit.
+7. Publish a GitHub Release for the tag with short notes: what changed and whether upgrading needs
    any action.
 
 Installed copies update with `claude plugin marketplace update claude-code-lens`, then

@@ -98,7 +98,8 @@ Lens needs Claude Code 2.1.287 or later, the release that added Claude Mods; it 
 - **A working line:** while a step runs, the spinner names it.
 - **Sub-agents:** a delegated step shows the model the agent ran on.
 
-Use Pi instead of Claude Code? The source-only, unreleased sibling is [Pi Lens](https://github.com/waldoibarra/pi-lens).
+Use Pi instead of Claude Code? Install the sibling [Pi Lens](https://github.com/waldoibarra/pi-lens)
+from `git:github.com/waldoibarra/pi-lens@v0.1.0`.
 
 Read [Views](/docs/views.md) before picking a view; it shows each one and lists every error line.
 
